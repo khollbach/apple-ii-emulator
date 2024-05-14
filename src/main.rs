@@ -67,10 +67,10 @@ impl Cpu {
 
             Instr::Tax => self.x = self.a,
             Instr::Txa => self.a = self.x,
-            Instr::Dex => self.x = self.x.wrapping_sub(1),
-            Instr::Inx => self.x = self.x.wrapping_add(1),
             Instr::Tay => self.y = self.a,
             Instr::Tya => self.a = self.y,
+            Instr::Dex => self.x = self.x.wrapping_sub(1),
+            Instr::Inx => self.x = self.x.wrapping_add(1),
             Instr::Dey => self.y = self.y.wrapping_sub(1),
             Instr::Iny => self.y = self.y.wrapping_add(1),
 
@@ -89,22 +89,14 @@ impl Cpu {
             Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
             Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
 
-            // todo: how to handle operands...
-            // ...maybe we lump this in with "immediate" mode?
-            Instr::Bpl => {
-                if !flags::is_set(self.flags, flags::NEGATIVE) {
-                    let offset: i8 = 0; // todo
-                                        // todo: confirm we're allowed to wrap below $0000, and above $ffff
-                    self.pc = (self.pc as i16).wrapping_add(offset as i16) as u16;
-                }
-            }
-            Instr::Bmi => todo!(),
-            Instr::Bvc => todo!(),
-            Instr::Bvs => todo!(),
-            Instr::Bcc => todo!(),
-            Instr::Bcs => todo!(),
-            Instr::Bne => todo!(),
-            Instr::Beq => todo!(),
+            Instr::Bpl => self.branch(flags::NEGATIVE, false),
+            Instr::Bmi => self.branch(flags::NEGATIVE, true),
+            Instr::Bvc => self.branch(flags::OVERFLOW, false),
+            Instr::Bvs => self.branch(flags::OVERFLOW, true),
+            Instr::Bcc => self.branch(flags::CARRY, false),
+            Instr::Bcs => self.branch(flags::CARRY, true),
+            Instr::Bne => self.branch(flags::ZERO, false),
+            Instr::Beq => self.branch(flags::ZERO, true),
 
             _ => todo!(),
         }
@@ -142,6 +134,15 @@ impl Cpu {
         self.sp = self.sp.wrapping_sub(1);
         let addr = 0x0100 + self.sp as u16;
         self.ram[addr as usize]
+    }
+
+    fn branch(&mut self, flag: u8, branch_if: bool) {
+        let is_set = flags::is_set(self.flags, flag);
+        if is_set == branch_if {
+            let value: u8 = self.ram[self.pc.checked_add(1).expect("overflow") as usize];
+            let offset = value as i8 as i16;
+            self.pc = self.pc.wrapping_add(offset as u16);
+        }
     }
 }
 
