@@ -44,6 +44,23 @@ impl Cpu {
 
     fn step(&mut self) {
         let (opcode, mode) = opcode::decode(self.ram[self.pc as usize]);
+
+        // match mode {
+        //     Mode::Accumulator => (),
+        //     Mode::Absolute => (),
+        //     Mode::AbsoluteX => (),
+        //     Mode::AbsoluteY => (),
+        //     Mode::Immediate => (),
+        //     Mode::Implied => (),
+        //     Mode::Indirect => (),
+        //     Mode::XIndirect => (),
+        //     Mode::IndirectY => (),
+        //     Mode::Relative => (),
+        //     Mode::ZeroPage => (),
+        //     Mode::ZeroPageX => (),
+        //     Mode::ZeroPageY => (),
+        // }
+
         match opcode {
             Instr::Brk => panic!("brk at {:#04x}", self.pc),
             Instr::Nop => (),
@@ -59,26 +76,10 @@ impl Cpu {
 
             Instr::Txs => self.sp = self.x,
             Instr::Tsx => self.x = self.sp,
-            Instr::Pha => {
-                let addr = 0x0100 + self.sp as u16;
-                self.ram[addr as usize] = self.a;
-                self.sp = self.sp.wrapping_sub(1);
-            }
-            Instr::Pla => {
-                self.sp = self.sp.wrapping_sub(1);
-                let addr = 0x0100 + self.sp as u16;
-                self.a = self.ram[addr as usize];
-            }
-            Instr::Php => {
-                let addr = 0x0100 + self.sp as u16;
-                self.ram[addr as usize] = self.flags;
-                self.sp = self.sp.wrapping_sub(1);
-            }
-            Instr::Plp => {
-                self.sp = self.sp.wrapping_sub(1);
-                let addr = 0x0100 + self.sp as u16;
-                self.flags = self.ram[addr as usize];
-            }
+            Instr::Pha => self.push(self.a),
+            Instr::Pla => self.a = self.pop(),
+            Instr::Php => self.push(self.flags),
+            Instr::Plp => self.flags = self.pop(),
 
             Instr::Clc => flags::clear(&mut self.flags, flags::CARRY),
             Instr::Sec => flags::set(&mut self.flags, flags::CARRY),
@@ -91,7 +92,7 @@ impl Cpu {
             // todo: how to handle operands...
             // ...maybe we lump this in with "immediate" mode?
             Instr::Bpl => {
-                if self.flags & flags::NEGATIVE == 0 {
+                if !flags::is_set(self.flags, flags::NEGATIVE) {
                     let offset: i8 = 0; // todo
                                         // todo: confirm we're allowed to wrap below $0000, and above $ffff
                     self.pc = (self.pc as i16).wrapping_add(offset as i16) as u16;
@@ -109,7 +110,38 @@ impl Cpu {
         }
 
         // todo: adjust the right amount, based on the instr
-        self.pc += 1;
+        // match mode {
+        //     Mode::Accumulator => (),
+        //     Mode::Absolute => (),
+        //     Mode::AbsoluteX => (),
+        //     Mode::AbsoluteY => (),
+        //     Mode::Immediate => (),
+        //     Mode::Implied => (),
+        //     Mode::Indirect => (),
+        //     Mode::XIndirect => (),
+        //     Mode::IndirectY => (),
+        //     Mode::Relative => (),
+        //     Mode::ZeroPage => (),
+        //     Mode::ZeroPageX => (),
+        //     Mode::ZeroPageY => (),
+        // }
+        if matches!(mode, Mode::Relative) {
+            self.pc += 2;
+        } else {
+            self.pc += 1;
+        }
+    }
+
+    fn push(&mut self, value: u8) {
+        let addr = 0x0100 + self.sp as u16;
+        self.ram[addr as usize] = value;
+        self.sp = self.sp.wrapping_sub(1);
+    }
+
+    fn pop(&mut self) -> u8 {
+        self.sp = self.sp.wrapping_sub(1);
+        let addr = 0x0100 + self.sp as u16;
+        self.ram[addr as usize]
     }
 }
 

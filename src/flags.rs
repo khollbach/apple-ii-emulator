@@ -17,3 +17,8 @@ pub fn clear(flags: &mut u8, flag: u8) {
     assert_eq!(flag.count_ones(), 1);
     *flags &= !flag;
 }
+
+pub fn is_set(flags: u8, flag: u8) -> bool {
+    assert_eq!(flag.count_ones(), 1);
+    flags & flag != 0
+}
