@@ -1,0 +1,1 @@
+This script converts an opcode table in text format into a Rust `match` statement, which is then copy-pasted into the main program.
