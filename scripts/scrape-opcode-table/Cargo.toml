@@ -1,0 +1,10 @@
+[package]
+name = "scrape-opcode-table"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.83"
+html_parser = "0.7.0"
+itertools = "0.12.1"
+scraper = "0.19.0"
