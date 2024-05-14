@@ -7,3 +7,13 @@ pub const BREAK: u8 = 1 << 4;
 const _RESERVED: u8 = 1 << 5;
 pub const OVERFLOW: u8 = 1 << 6;
 pub const NEGATIVE: u8 = 1 << 7;
+
+pub fn set(flags: &mut u8, flag: u8) {
+    assert_eq!(flag.count_ones(), 1);
+    *flags |= flag;
+}
+
+pub fn clear(flags: &mut u8, flag: u8) {
+    assert_eq!(flag.count_ones(), 1);
+    *flags &= !flag;
+}

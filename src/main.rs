@@ -80,13 +80,13 @@ impl Cpu {
                 self.flags = self.ram[addr as usize];
             }
 
-            Instr::Clc => self.flags &= !flags::CARRY,
-            Instr::Sec => self.flags |= flags::CARRY,
-            Instr::Cli => self.flags &= !flags::INTERRUPT,
-            Instr::Sei => self.flags |= flags::INTERRUPT,
-            Instr::Clv => self.flags &= !flags::OVERFLOW,
-            Instr::Cld => self.flags &= !flags::DECIMAL,
-            Instr::Sed => self.flags |= flags::DECIMAL,
+            Instr::Clc => flags::clear(&mut self.flags, flags::CARRY),
+            Instr::Sec => flags::set(&mut self.flags, flags::CARRY),
+            Instr::Cli => flags::clear(&mut self.flags, flags::INTERRUPT),
+            Instr::Sei => flags::set(&mut self.flags, flags::INTERRUPT),
+            Instr::Clv => flags::clear(&mut self.flags, flags::OVERFLOW),
+            Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
+            Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
 
             // todo: how to handle operands...
             // ...maybe we lump this in with "immediate" mode?
