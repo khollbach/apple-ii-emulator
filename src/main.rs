@@ -61,8 +61,33 @@ impl Cpu {
         //     Mode::ZeroPageY => (),
         // }
 
+        // Address of the currently executing instruction.
+        let curr_pc = self.pc;
+
+        // todo: adjust the right amount, based on the instr
+        // match mode {
+        //     Mode::Accumulator => (),
+        //     Mode::Absolute => (),
+        //     Mode::AbsoluteX => (),
+        //     Mode::AbsoluteY => (),
+        //     Mode::Immediate => (),
+        //     Mode::Implied => (),
+        //     Mode::Indirect => (),
+        //     Mode::XIndirect => (),
+        //     Mode::IndirectY => (),
+        //     Mode::Relative => (),
+        //     Mode::ZeroPage => (),
+        //     Mode::ZeroPageX => (),
+        //     Mode::ZeroPageY => (),
+        // }
+        if matches!(mode, Mode::Relative) {
+            self.pc = self.pc.checked_add(2).unwrap();
+        } else {
+            self.pc = self.pc.checked_add(1).unwrap();
+        }
+
         match opcode {
-            Instr::Brk => panic!("brk at {:#04x}", self.pc),
+            Instr::Brk => panic!("brk at {:#04x}", curr_pc),
             Instr::Nop => (),
 
             Instr::Tax => self.x = self.a,
@@ -99,7 +124,7 @@ impl Cpu {
             Instr::Beq => self.branch(flags::ZERO, true),
 
             Instr::Jmp => {
-                let addr = self.word(self.pc.checked_add(1).unwrap());
+                let addr = self.word(curr_pc.checked_add(1).unwrap());
                 match mode {
                     Mode::Absolute => self.pc = addr,
                     Mode::Indirect => self.pc = self.word(addr),
@@ -107,29 +132,24 @@ impl Cpu {
                 }
             }
 
-            _ => todo!(),
-        }
+            Instr::Jsr => {
+                let addr = self.word(curr_pc.checked_add(1).unwrap());
+                self.pc = addr;
 
-        // todo: adjust the right amount, based on the instr
-        // match mode {
-        //     Mode::Accumulator => (),
-        //     Mode::Absolute => (),
-        //     Mode::AbsoluteX => (),
-        //     Mode::AbsoluteY => (),
-        //     Mode::Immediate => (),
-        //     Mode::Implied => (),
-        //     Mode::Indirect => (),
-        //     Mode::XIndirect => (),
-        //     Mode::IndirectY => (),
-        //     Mode::Relative => (),
-        //     Mode::ZeroPage => (),
-        //     Mode::ZeroPageX => (),
-        //     Mode::ZeroPageY => (),
-        // }
-        if matches!(mode, Mode::Relative) {
-            self.pc += 2;
-        } else {
-            self.pc += 1;
+                let return_addr_minus_one = curr_pc.checked_add(2).unwrap();
+                self.push2(return_addr_minus_one);
+            }
+
+            Instr::Rts => self.pc = self.pop2().checked_add(1).unwrap(),
+
+            Instr::Rti => {
+                self.flags = self.pop();
+
+                // Note that unlike RTS, there is no off-by-one here.
+                self.pc = self.pop2();
+            }
+
+            _ => todo!(),
         }
     }
 
@@ -150,6 +170,21 @@ impl Cpu {
         self.sp = self.sp.wrapping_sub(1);
         let addr = 0x0100 + self.sp as u16;
         self.ram[addr as usize]
+    }
+
+    fn push2(&mut self, value: u16) {
+        let [lo, hi] = u16::to_le_bytes(value);
+
+        // The stack grows down, so this stores the bytes in little-endian
+        // order in RAM.
+        self.push(hi);
+        self.push(lo);
+    }
+
+    fn pop2(&mut self) -> u16 {
+        let lo = self.pop();
+        let hi = self.pop();
+        u16::from_le_bytes([lo, hi])
     }
 
     fn branch(&mut self, flag: u8, branch_if: bool) {
