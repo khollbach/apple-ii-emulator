@@ -98,6 +98,15 @@ impl Cpu {
             Instr::Bne => self.branch(flags::ZERO, false),
             Instr::Beq => self.branch(flags::ZERO, true),
 
+            Instr::Jmp => {
+                let addr = self.word(self.pc.checked_add(1).unwrap());
+                match mode {
+                    Mode::Absolute => self.pc = addr,
+                    Mode::Indirect => self.pc = self.word(addr),
+                    _ => unreachable!(),
+                }
+            }
+
             _ => todo!(),
         }
 
@@ -122,6 +131,13 @@ impl Cpu {
         } else {
             self.pc += 1;
         }
+    }
+
+    fn word(&self, addr: u16) -> u16 {
+        let lo = self.ram[addr as usize];
+        let hi = self.ram[addr.checked_add(1).unwrap() as usize];
+        let word = u16::from_le_bytes([lo, hi]);
+        word
     }
 
     fn push(&mut self, value: u8) {
