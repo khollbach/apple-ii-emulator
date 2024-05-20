@@ -45,50 +45,57 @@ impl Cpu {
     fn step(&mut self) {
         let (opcode, mode) = opcode::decode(self.ram[self.pc as usize]);
 
-        // match mode {
-        //     Mode::Accumulator => (),
-        //     Mode::Absolute => (),
-        //     Mode::AbsoluteX => (),
-        //     Mode::AbsoluteY => (),
-        //     Mode::Immediate => (),
-        //     Mode::Implied => (),
-        //     Mode::Indirect => (),
-        //     Mode::XIndirect => (),
-        //     Mode::IndirectY => (),
-        //     Mode::Relative => (),
-        //     Mode::ZeroPage => (),
-        //     Mode::ZeroPageX => (),
-        //     Mode::ZeroPageY => (),
-        // }
+        let mode_argument = match mode.instr_len() {
+            1 => 0u16,
+            2 => self.byte(self.pc.checked_add(1).unwrap()) as u16,
+            3 => self.word(self.pc.checked_add(1).unwrap()),
+            _ => unreachable!(),
+        };
 
-        // Address of the currently executing instruction.
-        let curr_pc = self.pc;
+        let operand16 = match mode {
+            Mode::Accumulator => self.a as u16,
+            Mode::Implied => 0,
 
-        // todo: adjust the right amount, based on the instr
-        // match mode {
-        //     Mode::Accumulator => (),
-        //     Mode::Absolute => (),
-        //     Mode::AbsoluteX => (),
-        //     Mode::AbsoluteY => (),
-        //     Mode::Immediate => (),
-        //     Mode::Implied => (),
-        //     Mode::Indirect => (),
-        //     Mode::XIndirect => (),
-        //     Mode::IndirectY => (),
-        //     Mode::Relative => (),
-        //     Mode::ZeroPage => (),
-        //     Mode::ZeroPageX => (),
-        //     Mode::ZeroPageY => (),
-        // }
-        if matches!(mode, Mode::Relative) {
-            self.pc = self.pc.checked_add(2).unwrap();
-        } else {
-            self.pc = self.pc.checked_add(1).unwrap();
-        }
+            Mode::Immediate => self.word(self.pc.checked_add(1).unwrap()),
+            Mode::Absolute => {
+                let addr = self.word(self.pc.checked_add(1).unwrap());
+                self.word(addr)
+            }
+            Mode::Indirect => {
+                let pointer = self.word(self.pc.checked_add(1).unwrap());
+                let addr = self.word(pointer);
+                self.word(addr)
+            }
+
+            Mode::AbsoluteX => todo!(),
+            Mode::AbsoluteY => todo!(),
+
+            Mode::XIndirect => todo!(),
+            Mode::IndirectY => todo!(),
+
+            Mode::Relative => 0, // ?
+
+            // todo: check the details here; and maybe clean it up
+            Mode::ZeroPage => {
+                let lo = self.ram[self.pc.checked_add(1).unwrap() as usize];
+                let hi = 0;
+                let addr = u16::from_le_bytes([lo, hi]);
+                self.word(addr)
+            }
+
+            Mode::ZeroPageX => todo!(),
+            Mode::ZeroPageY => todo!(),
+        };
+        let operand8 = operand16 as u8;
+
+        let curr_pc = self.pc; // Addr of currently executing instr.
+        self.pc = self.pc.checked_add(mode.instr_len().into()).unwrap();
 
         match opcode {
             Instr::Brk => panic!("brk at {:#04x}", curr_pc),
             Instr::Nop => (),
+
+            // todo: update flags accordingly, for all operations
 
             Instr::Tax => self.x = self.a,
             Instr::Txa => self.a = self.x,
@@ -113,6 +120,33 @@ impl Cpu {
             Instr::Clv => flags::clear(&mut self.flags, flags::OVERFLOW),
             Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
             Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
+
+            Instr::Adc => self.a = self.a.wrapping_add(operand8),
+            Instr::And => self.a &= operand8,
+            Instr::Sbc => self.a = self.a.wrapping_sub(operand8),
+            Instr::Ora => self.a |= operand8,
+            Instr::Eor => self.a ^= operand8,
+
+            Instr::Lda => self.a = operand8,
+            Instr::Ldx => self.x = operand8,
+            Instr::Ldy => self.y = operand8,
+
+            Instr::Sta => todo!(),
+            Instr::Stx => todo!(),
+            Instr::Sty => todo!(),
+
+            Instr::Rol => todo!(),
+            Instr::Ror => todo!(),
+            Instr::Asl => todo!(),
+            Instr::Lsr => todo!(),
+
+            Instr::Inc => todo!(),
+            Instr::Dec => todo!(),
+            Instr::Bit => todo!(),
+
+            Instr::Cmp => todo!(),
+            Instr::Cpx => todo!(),
+            Instr::Cpy => todo!(),
 
             Instr::Bpl => self.branch(flags::NEGATIVE, false),
             Instr::Bmi => self.branch(flags::NEGATIVE, true),
@@ -148,14 +182,16 @@ impl Cpu {
                 // Note that unlike RTS, there is no off-by-one here.
                 self.pc = self.pop2();
             }
-
-            _ => todo!(),
         }
     }
 
+    fn byte(&self, addr: u16) -> u8 {
+        self.ram[addr as usize]
+    }
+
     fn word(&self, addr: u16) -> u16 {
-        let lo = self.ram[addr as usize];
-        let hi = self.ram[addr.checked_add(1).unwrap() as usize];
+        let lo = self.byte(addr);
+        let hi = self.byte(addr.checked_add(1).unwrap());
         let word = u16::from_le_bytes([lo, hi]);
         word
     }
@@ -197,6 +233,29 @@ impl Cpu {
     }
 }
 
+impl Mode {
+    fn instr_len(self) -> u8 {
+        match self {
+            Mode::Implied => 1,
+            Mode::Accumulator => 1,
+
+            Mode::Relative => 2,
+            Mode::ZeroPage => 2,
+            Mode::ZeroPageX => 2,
+            Mode::ZeroPageY => 2,
+
+            Mode::Immediate => 3,
+            Mode::Absolute => 3,
+            Mode::AbsoluteX => 3,
+            Mode::AbsoluteY => 3,
+            Mode::Indirect => 3,
+            Mode::XIndirect => 3,
+            Mode::IndirectY => 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Accumulator,
 
