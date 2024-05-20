@@ -1,0 +1,107 @@
+pub enum Instr {
+    Adc,
+    And,
+    Asl,
+    Bcc,
+    Bcs,
+    Beq,
+    Bit,
+    Bmi,
+    Bne,
+    Bpl,
+    Brk,
+    Bvc,
+    Bvs,
+    Clc,
+    Cld,
+    Cli,
+    Clv,
+    Cmp,
+    Cpx,
+    Cpy,
+    Dec,
+    Dex,
+    Dey,
+    Eor,
+    Inc,
+    Inx,
+    Iny,
+    Jmp,
+    Jsr,
+    Lda,
+    Ldx,
+    Ldy,
+    Lsr,
+    Nop,
+    Ora,
+    Pha,
+    Php,
+    Pla,
+    Plp,
+    Rol,
+    Ror,
+    Rti,
+    Rts,
+    Sbc,
+    Sec,
+    Sed,
+    Sei,
+    Sta,
+    Stx,
+    Sty,
+    Tax,
+    Tay,
+    Tsx,
+    Txa,
+    Txs,
+    Tya,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Accumulator,
+
+    Absolute,
+    AbsoluteX,
+    AbsoluteY,
+
+    Immediate,
+
+    Implied,
+
+    Indirect,
+    XIndirect,
+    IndirectY,
+
+    Relative,
+
+    ZeroPage,
+    ZeroPageX,
+    ZeroPageY,
+}
+
+impl Mode {
+    pub fn instr_len(self) -> u16 {
+        1 + self.arg_len()
+    }
+
+    fn arg_len(self) -> u16 {
+        match self {
+            Mode::Implied => 0,
+            Mode::Accumulator => 0,
+
+            Mode::Immediate => 1,
+            Mode::Relative => 1,
+            Mode::ZeroPage => 1,
+            Mode::ZeroPageX => 1,
+            Mode::ZeroPageY => 1,
+
+            Mode::Absolute => 2,
+            Mode::AbsoluteX => 2,
+            Mode::AbsoluteY => 2,
+            Mode::Indirect => 2,
+            Mode::XIndirect => 2,
+            Mode::IndirectY => 2,
+        }
+    }
+}

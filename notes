@@ -21,7 +21,7 @@ abs	    $1234       mem $1234 -- for jumps, want mem_addr
 abs,X	$1234       mem $123a
 abs,Y	$1234       mem $123a
 #	    $ab         lit $ab
-impl	--          reg A  (or None(e.g. BRK, flag ops))
+impl	--          none
 ind	    $1234       mem $5678 -- for jumps, we care about the mem_addr (not the value there)
 X,ind	$55         mem $abcd
 ind,Y	$56         mem $abc2
@@ -30,10 +30,3 @@ zpg	    $55         mem $0055
 zpg,X	$55         mem $005a
 zpg,Y	$55         mem $005a
 
-loc methods:
-    * get_byte -> u8
-    * get_word -> u16 (can panic)
-        > I'm not sure this ever comes up ..?
-    * set_byte(u8)
-    * mem_addr -> u16 (can panic)
-        "addr_of"?
