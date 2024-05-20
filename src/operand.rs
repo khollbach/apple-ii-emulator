@@ -32,23 +32,54 @@ impl Operand {
                 let addr = u16::from_le_bytes([lo, 0]);
                 Self::Memory { addr }
             }
-            Mode::ZeroPageX => todo!(),
-            Mode::ZeroPageY => todo!(),
+            Mode::ZeroPageX => {
+                let mut lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
+                lo = lo.wrapping_add(cpu.x);
+                let addr = u16::from_le_bytes([lo, 0]);
+                Self::Memory { addr }
+            }
+            Mode::ZeroPageY => {
+                let mut lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
+                lo = lo.wrapping_add(cpu.y);
+                let addr = u16::from_le_bytes([lo, 0]);
+                Self::Memory { addr }
+            }
 
             Mode::Absolute => {
                 let addr = cpu.get_word(cpu.pc.checked_add(1).unwrap());
                 Self::Memory { addr }
             }
-            Mode::AbsoluteX => todo!(),
-            Mode::AbsoluteY => todo!(),
+            Mode::AbsoluteX => {
+                let mut addr = cpu.get_word(cpu.pc.checked_add(1).unwrap());
+                addr = addr.checked_add(cpu.x as u16).unwrap();
+                Self::Memory { addr }
+            }
+            Mode::AbsoluteY => {
+                let mut addr = cpu.get_word(cpu.pc.checked_add(1).unwrap());
+                addr = addr.checked_add(cpu.y as u16).unwrap();
+                Self::Memory { addr }
+            }
 
             Mode::Indirect => {
                 let pointer = cpu.get_word(cpu.pc.checked_add(1).unwrap());
                 let addr = cpu.get_word(pointer);
                 Self::Memory { addr }
             }
-            Mode::XIndirect => todo!(),
-            Mode::IndirectY => todo!(),
+
+            Mode::XIndirect => {
+                let mut lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
+                lo = lo.wrapping_add(cpu.x);
+                let pointer = u16::from_le_bytes([lo, 0]);
+                let addr = cpu.get_word(pointer);
+                Self::Memory { addr }
+            }
+            Mode::IndirectY => {
+                let lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
+                let pointer = u16::from_le_bytes([lo, 0]);
+                let mut addr = cpu.get_word(pointer);
+                addr = addr.checked_add(cpu.y as u16).unwrap();
+                Self::Memory { addr }
+            }
         }
     }
 

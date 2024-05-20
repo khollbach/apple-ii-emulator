@@ -92,16 +92,20 @@ impl Mode {
 
             Mode::Immediate => 1,
             Mode::Relative => 1,
+
             Mode::ZeroPage => 1,
             Mode::ZeroPageX => 1,
             Mode::ZeroPageY => 1,
 
+            // Note these are not the same as Indirect.
+            Mode::XIndirect => 1,
+            Mode::IndirectY => 1,
+
             Mode::Absolute => 2,
             Mode::AbsoluteX => 2,
             Mode::AbsoluteY => 2,
+
             Mode::Indirect => 2,
-            Mode::XIndirect => 2,
-            Mode::IndirectY => 2,
         }
     }
 }
