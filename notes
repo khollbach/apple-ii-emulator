@@ -30,11 +30,6 @@ zpg	    $55         mem $0055
 zpg,X	$55         mem $005a
 zpg,Y	$55         mem $005a
 
-
-
-
-
-
     flags:
 
 arith:          N V Z C
@@ -53,4 +48,12 @@ arith:          N V Z C
 
 BIT is a special case: N V Z -
         (but not in the usual way)
+
+---
+
+todo: maybe refactor flags helpers somehow for more concise callsites
+todo: maybe review the "nz" approach and consider if you like it.
+todo: maybe refactor instr execution into a module with a bunch of
+        shared state wrapped up in an object
+todo: look into refactoring adc and sbc to share code
 

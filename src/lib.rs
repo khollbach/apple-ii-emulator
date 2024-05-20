@@ -34,7 +34,8 @@ impl Cpu {
         }
     }
 
-    pub fn run(mut self) -> Vec<u8> {
+    pub fn run(mut self, start_addr: u16) -> Vec<u8> {
+        self.pc = start_addr;
         loop {
             self.step();
         }
@@ -42,7 +43,8 @@ impl Cpu {
 
     /// If the CPU would "halt" gracefully, this exits and returns the contents
     /// of ram. This can be useful for debugging purposes.
-    pub fn run_until_halt(mut self) -> Vec<u8> {
+    pub fn run_until_halt(mut self, start_addr: u16) -> Vec<u8> {
+        self.pc = start_addr;
         while !self.would_halt() {
             self.step();
         }
@@ -99,8 +101,54 @@ impl Cpu {
             Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
             Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
 
-            Instr::Adc => self.a = self.nz(self.a.wrapping_add(loc.get(self))),
-            Instr::Sbc => self.a = self.nz(self.a.wrapping_sub(loc.get(self))),
+            Instr::Adc => {
+                let v = loc.get(self);
+
+                let mut sum = 0u16;
+                sum += self.a as u16;
+                sum += v as u16;
+                if flags::is_set(self.flags, flags::CARRY) {
+                    sum += 1;
+                }
+
+                let carry = sum >= 0x0100;
+                let sum = sum as u8;
+
+                let overflow = {
+                    let same_sign = self.a & 0x80 == v & 0x80;
+                    let flipped = sum & 0x80 != self.a & 0x80;
+                    same_sign && flipped
+                };
+
+                self.a = self.nz(sum);
+                flags::set_to(&mut self.flags, flags::CARRY, carry);
+                flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+            }
+            Instr::Sbc => {
+                let v = loc.get(self);
+                let neg_v = (v as i8 * -1) as u8;
+
+                let mut sum: u16 = 0;
+                sum += self.a as u16;
+                sum += neg_v as u16;
+                if flags::is_set(self.flags, flags::CARRY) {
+                    sum = sum.wrapping_sub(1);
+                }
+
+                let carry = sum >= 0x0100;
+                let sum = sum as u8;
+
+                let overflow = {
+                    let same_sign = self.a & 0x80 == neg_v & 0x80;
+                    let flipped = sum & 0x80 != self.a & 0x80;
+                    same_sign && flipped
+                };
+
+                self.a = self.nz(sum);
+                flags::set_to(&mut self.flags, flags::CARRY, carry);
+                flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+            }
+
             Instr::And => self.a &= self.nz(loc.get(self)),
             Instr::Ora => self.a |= self.nz(loc.get(self)),
             Instr::Eor => self.a ^= self.nz(loc.get(self)),
@@ -114,28 +162,32 @@ impl Cpu {
             Instr::Sty => loc.set(self, self.y),
 
             Instr::Asl => {
-                let v = self.nz(loc.get(self) << 1);
+                let (v, c) = loc.get(self).overflowing_shl(1);
                 loc.set(self, v);
+                self.nz(v);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
             }
             Instr::Lsr => {
-                let v = self.nz(loc.get(self) >> 1);
+                let (v, c) = loc.get(self).overflowing_shr(1);
                 loc.set(self, v);
+                self.nz(v);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
             }
             Instr::Rol => {
-                let mut v = loc.get(self);
-                v <<= 1;
+                let (mut v, c) = loc.get(self).overflowing_shl(1);
                 v |= flags::is_set(self.flags, flags::CARRY) as u8;
-                self.nz(v);
                 loc.set(self, v);
+                self.nz(v);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
             }
             Instr::Ror => {
-                let mut v = loc.get(self);
-                v >>= 1;
+                let (mut v, c) = loc.get(self).overflowing_shr(1);
                 if flags::is_set(self.flags, flags::CARRY) {
                     v |= 0x80;
                 }
-                self.nz(v);
                 loc.set(self, v);
+                self.nz(v);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
             }
 
             Instr::Inc => {
@@ -148,9 +200,27 @@ impl Cpu {
             }
             Instr::Bit => todo!(),
 
-            Instr::Cmp => todo!(),
-            Instr::Cpx => todo!(),
-            Instr::Cpy => todo!(),
+            Instr::Cmp => {
+                let v = loc.get(self);
+                let neg_v = v as i8 * -1;
+                let (cmp, c) = self.a.overflowing_add(neg_v as u8);
+                self.nz(cmp);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
+            }
+            Instr::Cpx => {
+                let v = loc.get(self);
+                let neg_v = v as i8 * -1;
+                let (cmp, c) = self.x.overflowing_add(neg_v as u8);
+                self.nz(cmp);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
+            }
+            Instr::Cpy => {
+                let v = loc.get(self);
+                let neg_v = v as i8 * -1;
+                let (cmp, c) = self.y.overflowing_add(neg_v as u8);
+                self.nz(cmp);
+                flags::set_to(&mut self.flags, flags::CARRY, c);
+            }
 
             Instr::Bpl => self.branch(loc.addr(), flags::NEGATIVE, false),
             Instr::Bmi => self.branch(loc.addr(), flags::NEGATIVE, true),
