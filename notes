@@ -30,3 +30,27 @@ zpg	    $55         mem $0055
 zpg,X	$55         mem $005a
 zpg,Y	$55         mem $005a
 
+
+
+
+
+
+    flags:
+
+arith:          N V Z C
+{CMPs, shifts}: N - Z C
+{xfer TO regs   N - Z -
+ excl TXS(sp)
+ incl loads
+ incl PLA,
+ logical,
+ INC/DEC mem.}
+
+{branches,      - - - -
+ jumps,
+ maybe some
+ other stuff}
+
+BIT is a special case: N V Z -
+        (but not in the usual way)
+

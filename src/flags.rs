@@ -18,6 +18,14 @@ pub fn clear(flags: &mut u8, flag: u8) {
     *flags &= !flag;
 }
 
+pub fn set_to(flags: &mut u8, flag: u8, setting: bool) {
+    if setting {
+        set(flags, flag)
+    } else {
+        clear(flags, flag)
+    }
+}
+
 pub fn is_set(flags: u8, flag: u8) -> bool {
     assert_eq!(flag.count_ones(), 1);
     flags & flag != 0
