@@ -3,21 +3,23 @@ mod instr;
 mod opcode;
 mod operand;
 
+use std::{fmt, io};
+
 use instr::{Instr, Mode};
 use operand::Operand;
 
 pub const MEM_LEN: usize = 2_usize.pow(16);
 
 pub struct Cpu {
-    pc: u16,
-    sp: u8,
-    flags: u8,
+    pub pc: u16,
+    pub sp: u8,
+    pub flags: u8,
 
-    a: u8,
-    x: u8,
-    y: u8,
+    pub a: u8,
+    pub x: u8,
+    pub y: u8,
 
-    ram: Vec<u8>,
+    pub ram: Vec<u8>,
 }
 
 impl Cpu {
@@ -41,22 +43,93 @@ impl Cpu {
         }
     }
 
-    /// If the CPU would "halt" gracefully, this exits and returns the contents
-    /// of ram. This can be useful for debugging purposes.
-    pub fn run_until_halt(mut self, start_addr: u16) -> Vec<u8> {
+    /// If the CPU would "halt" gracefully, this will return instead of looping.
+    /// This can be useful for debugging.
+    pub fn run_until_halt(mut self, start_addr: u16) -> Self {
+        let mut enable_debugger = false;
+
         self.pc = start_addr;
-        while !self.would_halt() {
+        for i in 0.. {
+            if self.would_halt() {
+                eprintln!("would halt");
+                break;
+            }
+
+            // Detect long-running loops that aren't a simple "halt instruction".
+            if i != 0 && i % 100_000_000 == 0 {
+                eprintln!("after {}M instructions,", i / 1_000_000);
+                eprintln!("{self:?}");
+                eprintln!();
+            }
+
+            // // """breakpoint"""
+            // if self.pc == 0x058d {
+            //     enable_debugger = true;
+            // }
+
+            // todo: hacky "single-step debugger", for testing
+            if enable_debugger {
+                eprintln!("{:?}", self);
+                let (instr, mode) = opcode::decode(self.ram[self.pc as usize]);
+                let instr_bytes = &self.ram[self.pc as usize..][..mode.instr_len() as usize];
+                eprintln!("next instr: {:02x?} {:?} {:?}", instr_bytes, instr, mode);
+
+                loop {
+                    let line: String = io::stdin().lines().next().unwrap().unwrap();
+                    let cmd = line.trim();
+                    if cmd.is_empty() {
+                        break;
+                    }
+
+                    if cmd.contains('.') {
+                        eprintln!("not yet implemented: range of bytes");
+                        continue;
+                    }
+
+                    let is_valid = cmd.chars().all(|c| c.is_digit(16)) && cmd.len() <= 4;
+                    if !is_valid {
+                        continue;
+                    }
+
+                    let padding = "0".repeat(4_usize.saturating_sub(cmd.len()));
+                    let cmd = format!("{}{}", padding, cmd);
+                    let addr = hex::decode(cmd).unwrap();
+                    assert_eq!(addr.len(), 2);
+                    let addr = u16::from_be_bytes([addr[0], addr[1]]);
+                    eprintln!("ram[${:04x}]: ${:02x}", addr, self.get_byte(addr));
+                }
+            }
+
+            // todo: hack: detect jumping to `start` label.
+            let (_, mode) = opcode::decode(self.ram[self.pc as usize]);
+            let instr_bytes = &self.ram[self.pc as usize..][..mode.instr_len() as usize];
+            if instr_bytes == [0x4c, 0x00, 0x04] {
+                eprintln!("would jump to start");
+                break;
+            }
+
             self.step();
         }
-        self.ram
+        self
     }
 
     /// Hack for testing: detect a "halt" instruction.
     fn would_halt(&self) -> bool {
+        self.would_halt_jmp() || self.would_halt_branch()
+    }
+
+    fn would_halt_jmp(&self) -> bool {
         let [lo, hi] = self.pc.to_le_bytes();
         let jmp_absolute = 0x4c;
         let halt = [jmp_absolute, lo, hi];
         &self.ram[self.pc as usize..][..3] == &halt
+    }
+
+    fn would_halt_branch(&self) -> bool {
+        let (instr, mode) = opcode::decode(self.ram[self.pc as usize]);
+        let is_branch = mode == Mode::Relative;
+        let in_place = self.get_byte(self.pc.checked_add(1).unwrap()) as i8 == -2;
+        is_branch && in_place && would_branch(instr, self.flags)
     }
 
     fn step(&mut self) {
@@ -68,17 +141,13 @@ impl Cpu {
         self.pc = self.pc.checked_add(mode.instr_len()).unwrap();
 
         match instr {
-            Instr::Brk => panic!("brk at {:#04x}", curr_pc),
+            Instr::Brk => panic!("brk at 0x{:04x}", curr_pc),
             Instr::Nop => (),
 
             Instr::Tax => self.x = self.nz(self.a),
             Instr::Txa => self.a = self.nz(self.x),
             Instr::Tay => self.y = self.nz(self.a),
             Instr::Tya => self.a = self.nz(self.y),
-            Instr::Dex => self.x = self.nz(self.x.wrapping_sub(1)),
-            Instr::Inx => self.x = self.nz(self.x.wrapping_add(1)),
-            Instr::Dey => self.y = self.nz(self.y.wrapping_sub(1)),
-            Instr::Iny => self.y = self.nz(self.y.wrapping_add(1)),
 
             Instr::Txs => self.sp = self.x,
             Instr::Tsx => self.x = self.nz(self.sp),
@@ -93,6 +162,26 @@ impl Cpu {
                 self.flags = self.nz(v);
             }
 
+            Instr::Lda => self.a = self.nz(loc.get(self)),
+            Instr::Ldx => self.x = self.nz(loc.get(self)),
+            Instr::Ldy => self.y = self.nz(loc.get(self)),
+            Instr::Sta => loc.set(self, self.a),
+            Instr::Stx => loc.set(self, self.x),
+            Instr::Sty => loc.set(self, self.y),
+
+            Instr::Inx => self.x = self.nz(self.x.wrapping_add(1)),
+            Instr::Dex => self.x = self.nz(self.x.wrapping_sub(1)),
+            Instr::Iny => self.y = self.nz(self.y.wrapping_add(1)),
+            Instr::Dey => self.y = self.nz(self.y.wrapping_sub(1)),
+            Instr::Inc => {
+                let v = self.nz(loc.get(self).wrapping_add(1));
+                loc.set(self, v);
+            }
+            Instr::Dec => {
+                let v = self.nz(loc.get(self).wrapping_sub(1));
+                loc.set(self, v);
+            }
+
             Instr::Clc => flags::clear(&mut self.flags, flags::CARRY),
             Instr::Sec => flags::set(&mut self.flags, flags::CARRY),
             Instr::Cli => flags::clear(&mut self.flags, flags::INTERRUPT),
@@ -101,65 +190,31 @@ impl Cpu {
             Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
             Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
 
-            Instr::Adc => {
-                let v = loc.get(self);
-
-                let mut sum = 0u16;
-                sum += self.a as u16;
-                sum += v as u16;
-                if flags::is_set(self.flags, flags::CARRY) {
-                    sum += 1;
-                }
-
-                let carry = sum >= 0x0100;
-                let sum = sum as u8;
-
-                let overflow = {
-                    let same_sign = self.a & 0x80 == v & 0x80;
-                    let flipped = sum & 0x80 != self.a & 0x80;
-                    same_sign && flipped
-                };
-
-                self.a = self.nz(sum);
-                flags::set_to(&mut self.flags, flags::CARRY, carry);
-                flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
-            }
-            Instr::Sbc => {
-                let v = loc.get(self);
-                let neg_v = (v as i8 * -1) as u8;
-
-                let mut sum: u16 = 0;
-                sum += self.a as u16;
-                sum += neg_v as u16;
-                if flags::is_set(self.flags, flags::CARRY) {
-                    sum = sum.wrapping_sub(1);
-                }
-
-                let carry = sum >= 0x0100;
-                let sum = sum as u8;
-
-                let overflow = {
-                    let same_sign = self.a & 0x80 == neg_v & 0x80;
-                    let flipped = sum & 0x80 != self.a & 0x80;
-                    same_sign && flipped
-                };
-
-                self.a = self.nz(sum);
-                flags::set_to(&mut self.flags, flags::CARRY, carry);
-                flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
-            }
-
             Instr::And => self.a &= self.nz(loc.get(self)),
             Instr::Ora => self.a |= self.nz(loc.get(self)),
             Instr::Eor => self.a ^= self.nz(loc.get(self)),
 
-            Instr::Lda => self.a = self.nz(loc.get(self)),
-            Instr::Ldx => self.x = self.nz(loc.get(self)),
-            Instr::Ldy => self.y = self.nz(loc.get(self)),
+            Instr::Adc => {
+                let v = loc.get(self);
+                self.a = self.adc(self.a, v);
+            }
+            Instr::Sbc => {
+                let v = loc.get(self);
+                self.a = self.sbc(self.a, v);
+            }
 
-            Instr::Sta => loc.set(self, self.a),
-            Instr::Stx => loc.set(self, self.x),
-            Instr::Sty => loc.set(self, self.y),
+            Instr::Cmp => {
+                flags::set(&mut self.flags, flags::CARRY);
+                let _ = self.sbc(self.a, loc.get(self));
+            }
+            Instr::Cpx => {
+                flags::set(&mut self.flags, flags::CARRY);
+                let _ = self.sbc(self.x, loc.get(self));
+            }
+            Instr::Cpy => {
+                flags::set(&mut self.flags, flags::CARRY);
+                let _ = self.sbc(self.y, loc.get(self));
+            }
 
             Instr::Asl => {
                 let (v, c) = loc.get(self).overflowing_shl(1);
@@ -190,15 +245,6 @@ impl Cpu {
                 flags::set_to(&mut self.flags, flags::CARRY, c);
             }
 
-            Instr::Inc => {
-                let v = self.nz(loc.get(self).wrapping_add(1));
-                loc.set(self, v);
-            }
-            Instr::Dec => {
-                let v = self.nz(loc.get(self).wrapping_sub(1));
-                loc.set(self, v);
-            }
-
             Instr::Bit => {
                 let v = loc.get(self);
                 flags::set_to(&mut self.flags, flags::NEGATIVE, v >= 0x80);
@@ -206,36 +252,18 @@ impl Cpu {
                 flags::set_to(&mut self.flags, flags::ZERO, (v & self.a) == 0);
             }
 
-            Instr::Cmp => {
-                let v = loc.get(self);
-                let neg_v = v as i8 * -1;
-                let (cmp, c) = self.a.overflowing_add(neg_v as u8);
-                self.nz(cmp);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
+            b @ (Instr::Bpl
+            | Instr::Bmi
+            | Instr::Bvc
+            | Instr::Bvs
+            | Instr::Bcc
+            | Instr::Bcs
+            | Instr::Bne
+            | Instr::Beq) => {
+                if would_branch(b, self.flags) {
+                    self.pc = loc.addr();
+                }
             }
-            Instr::Cpx => {
-                let v = loc.get(self);
-                let neg_v = v as i8 * -1;
-                let (cmp, c) = self.x.overflowing_add(neg_v as u8);
-                self.nz(cmp);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
-            }
-            Instr::Cpy => {
-                let v = loc.get(self);
-                let neg_v = v as i8 * -1;
-                let (cmp, c) = self.y.overflowing_add(neg_v as u8);
-                self.nz(cmp);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
-            }
-
-            Instr::Bpl => self.branch(loc.addr(), flags::NEGATIVE, false),
-            Instr::Bmi => self.branch(loc.addr(), flags::NEGATIVE, true),
-            Instr::Bvc => self.branch(loc.addr(), flags::OVERFLOW, false),
-            Instr::Bvs => self.branch(loc.addr(), flags::OVERFLOW, true),
-            Instr::Bcc => self.branch(loc.addr(), flags::CARRY, false),
-            Instr::Bcs => self.branch(loc.addr(), flags::CARRY, true),
-            Instr::Bne => self.branch(loc.addr(), flags::ZERO, false),
-            Instr::Beq => self.branch(loc.addr(), flags::ZERO, true),
 
             Instr::Jmp => self.pc = loc.addr(),
 
@@ -312,10 +340,80 @@ impl Cpu {
         value
     }
 
-    fn branch(&mut self, addr: u16, flag: u8, when: bool) {
-        let is_set = flags::is_set(self.flags, flag);
-        if is_set == when {
-            self.pc = addr;
+    #[must_use]
+    fn adc(&mut self, a: u8, v: u8) -> u8 {
+        let mut sum = 0u16;
+        sum += a as u16;
+        sum += v as u16;
+        if flags::is_set(self.flags, flags::CARRY) {
+            sum += 1;
         }
+
+        let carry = sum >= 0x0100;
+        let sum = sum as u8;
+
+        let overflow = {
+            let same_sign = a & 0x80 == v & 0x80;
+            let flipped = sum & 0x80 != a & 0x80;
+            same_sign && flipped
+        };
+
+        flags::set_to(&mut self.flags, flags::CARRY, carry);
+        flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+        self.nz(sum)
+    }
+
+    #[must_use]
+    fn sbc(&mut self, a: u8, v: u8) -> u8 {
+        let neg_v = (v as i8 * -1) as u8;
+
+        let mut sum: u16 = 0;
+        sum += a as u16;
+        sum += neg_v as u16;
+        if !flags::is_set(self.flags, flags::CARRY) {
+            sum = sum.wrapping_sub(1);
+        }
+
+        // todo: re-write this somehow so there's no need for the special case sum=0.
+        let carry = sum >= 0x0100 || sum == 0;
+        let sum = sum as u8;
+
+        let overflow = {
+            let same_sign = a & 0x80 == neg_v & 0x80;
+            let flipped = sum & 0x80 != a & 0x80;
+            same_sign && flipped
+        };
+
+        flags::set_to(&mut self.flags, flags::CARRY, carry);
+        flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+        self.nz(sum)
+    }
+}
+
+fn would_branch(branch: Instr, cpu_flags: u8) -> bool {
+    let (flag, when) = match branch {
+        Instr::Bpl => (flags::NEGATIVE, false),
+        Instr::Bmi => (flags::NEGATIVE, true),
+        Instr::Bvc => (flags::OVERFLOW, false),
+        Instr::Bvs => (flags::OVERFLOW, true),
+        Instr::Bcc => (flags::CARRY, false),
+        Instr::Bcs => (flags::CARRY, true),
+        Instr::Bne => (flags::ZERO, false),
+        Instr::Beq => (flags::ZERO, true),
+        _ => panic!("not a branch: {branch:?}"),
+    };
+    flags::is_set(cpu_flags, flag) == when
+}
+
+impl fmt::Debug for Cpu {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "pc: ${:04x}", self.pc)?;
+        writeln!(f, "sp: ${:02x}", self.sp)?;
+        writeln!(f, "flags: {:08b}", self.flags)?;
+        writeln!(f, "       NV-BDIZC")?;
+        writeln!(f, "a: ${:02x}", self.a)?;
+        writeln!(f, "x: ${:02x}", self.x)?;
+        write!(f, "y: ${:02x}", self.y)?;
+        Ok(())
     }
 }

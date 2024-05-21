@@ -155,6 +155,6 @@ pub fn decode(opcode: u8) -> (Instr, Mode) {
         0xf9 => (Instr::Sbc, Mode::AbsoluteY),
         0xfd => (Instr::Sbc, Mode::AbsoluteX),
         0xfe => (Instr::Inc, Mode::AbsoluteX),
-        _ => panic!("invalid opcode: {opcode:#04x}"),
+        _ => panic!("invalid opcode: 0x{opcode:02x}"),
     }
 }

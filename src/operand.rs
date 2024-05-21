@@ -22,8 +22,11 @@ impl Operand {
             Mode::Relative => {
                 let value = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
                 let offset = value as i8 as i16;
+                // Note: branch offset is relative to the *next* instruction,
+                // not the current one.
+                //
                 // todo: detect under/overflow and panic
-                let addr = cpu.pc.wrapping_add(offset as u16);
+                let addr = cpu.pc.wrapping_add(2).wrapping_add(offset as u16);
                 Self::Memory { addr }
             }
 
