@@ -198,7 +198,13 @@ impl Cpu {
                 let v = self.nz(loc.get(self).wrapping_sub(1));
                 loc.set(self, v);
             }
-            Instr::Bit => todo!(),
+
+            Instr::Bit => {
+                let v = loc.get(self);
+                flags::set_to(&mut self.flags, flags::NEGATIVE, v >= 0x80);
+                flags::set_to(&mut self.flags, flags::OVERFLOW, v >= 0x40);
+                flags::set_to(&mut self.flags, flags::ZERO, (v & self.a) == 0);
+            }
 
             Instr::Cmp => {
                 let v = loc.get(self);
