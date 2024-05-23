@@ -63,7 +63,7 @@ impl Cpu {
             }
 
             // // """breakpoint"""
-            // if self.pc == 0x058d {
+            // if self.pc == 0x0670 {
             //     enable_debugger = true;
             // }
 
@@ -156,7 +156,12 @@ impl Cpu {
                 let v = self.pop();
                 self.a = self.nz(v);
             }
-            Instr::Php => self.push(self.flags),
+            Instr::Php => {
+                let mut f = self.flags;
+                flags::set(&mut f, flags::BREAK);
+                flags::set(&mut f, flags::RESERVED);
+                self.push(f);
+            }
             Instr::Plp => {
                 let v = self.pop();
                 self.flags = self.nz(v);
