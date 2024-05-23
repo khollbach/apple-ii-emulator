@@ -63,7 +63,7 @@ impl Cpu {
             }
 
             // // """breakpoint"""
-            // if self.pc == 0x0892 {
+            // if self.pc == 0x08fc {
             //     enable_debugger = true;
             // }
 
@@ -214,20 +214,20 @@ impl Cpu {
             }
             Instr::Sbc => {
                 let v = loc.get(self);
-                self.a = self.sbc(self.a, v);
+                self.a = self.sbc(self.a, v, true);
             }
 
             Instr::Cmp => {
                 flags::set(&mut self.flags, flags::CARRY);
-                let _ = self.sbc(self.a, loc.get(self));
+                let _ = self.sbc(self.a, loc.get(self), false);
             }
             Instr::Cpx => {
                 flags::set(&mut self.flags, flags::CARRY);
-                let _ = self.sbc(self.x, loc.get(self));
+                let _ = self.sbc(self.x, loc.get(self), false);
             }
             Instr::Cpy => {
                 flags::set(&mut self.flags, flags::CARRY);
-                let _ = self.sbc(self.y, loc.get(self));
+                let _ = self.sbc(self.y, loc.get(self), false);
             }
 
             Instr::Asl => {
@@ -377,8 +377,10 @@ impl Cpu {
         self.nz(sum)
     }
 
+    // todo: this needs a major refactor. (Maybe we make it a function w/o side
+    // effects, that returns a result alongside various flags?)
     #[must_use]
-    fn sbc(&mut self, a: u8, v: u8) -> u8 {
+    fn sbc(&mut self, a: u8, v: u8, affects_overflow_flag: bool) -> u8 {
         let neg_v = (v as i8 * -1) as u8;
 
         let mut sum: u16 = 0;
@@ -399,7 +401,9 @@ impl Cpu {
         };
 
         flags::set_to(&mut self.flags, flags::CARRY, carry);
-        flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+        if affects_overflow_flag {
+            flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+        }
         self.nz(sum)
     }
 }
