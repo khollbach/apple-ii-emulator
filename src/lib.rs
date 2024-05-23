@@ -52,7 +52,7 @@ impl Cpu {
         for i in 0.. {
             if self.would_halt() {
                 eprintln!("would halt");
-                break;
+                enable_debugger = true;
             }
 
             // Detect long-running loops that aren't a simple "halt instruction".
@@ -309,7 +309,7 @@ impl Cpu {
 
     /// Pop from the stack.
     fn pop(&mut self) -> u8 {
-        self.sp = self.sp.wrapping_sub(1);
+        self.sp = self.sp.wrapping_add(1);
         let addr = 0x0100 + self.sp as u16;
         self.ram[addr as usize]
     }
