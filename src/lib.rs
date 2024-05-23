@@ -63,7 +63,7 @@ impl Cpu {
             }
 
             // // """breakpoint"""
-            // if self.pc == 0x0670 {
+            // if self.pc == 0x0892 {
             //     enable_debugger = true;
             // }
 
@@ -195,9 +195,18 @@ impl Cpu {
             Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
             Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
 
-            Instr::And => self.a &= self.nz(loc.get(self)),
-            Instr::Ora => self.a |= self.nz(loc.get(self)),
-            Instr::Eor => self.a ^= self.nz(loc.get(self)),
+            Instr::And => {
+                self.a &= loc.get(self);
+                self.nz(self.a);
+            }
+            Instr::Ora => {
+                self.a |= loc.get(self);
+                self.nz(self.a);
+            }
+            Instr::Eor => {
+                self.a ^= loc.get(self);
+                self.nz(self.a);
+            }
 
             Instr::Adc => {
                 let v = loc.get(self);
