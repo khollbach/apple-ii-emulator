@@ -53,11 +53,10 @@ BIT is a special case: N V Z -
 
 currently debugging via this test suite:
 * https://github.com/Klaus2m5/6502_65C02_functional_tests/blob/master/6502_functional_test.a65
-* left off around $05d4 (stack operations)
-    with an error at $05eb
-    * see:
-        /home/kevan/code/play/6502_65C02_functional_tests/tmp/assembled-with-extra-flags/6502_functional_test.lst
-* todo: debug!
+* left off at $09cf (break & return from interrupt)
+    * should we test these now, or come back to them?
+* see:
+    /home/kevan/code/play/6502_65C02_functional_tests/tmp/assembled-with-extra-flags/6502_functional_test.lst
 
 ---
 
