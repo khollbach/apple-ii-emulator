@@ -63,7 +63,7 @@ impl Cpu {
             }
 
             // // """breakpoint"""
-            // if self.pc == 0x1bb1 {
+            // if self.pc == 0x22df && self.x == 3 {
             //     enable_debugger = true;
             // }
 
@@ -231,26 +231,26 @@ impl Cpu {
             }
 
             Instr::Asl => {
-                let (v, c) = loc.get(self).overflowing_shl(1);
+                let (v, c) = overflowing_shl(loc.get(self), 1);
                 loc.set(self, v);
                 self.nz(v);
                 flags::set_to(&mut self.flags, flags::CARRY, c);
             }
             Instr::Lsr => {
-                let (v, c) = loc.get(self).overflowing_shr(1);
+                let (v, c) = overflowing_shr(loc.get(self), 1);
                 loc.set(self, v);
                 self.nz(v);
                 flags::set_to(&mut self.flags, flags::CARRY, c);
             }
             Instr::Rol => {
-                let (mut v, c) = loc.get(self).overflowing_shl(1);
+                let (mut v, c) = overflowing_shl(loc.get(self), 1);
                 v |= flags::is_set(self.flags, flags::CARRY) as u8;
                 loc.set(self, v);
                 self.nz(v);
                 flags::set_to(&mut self.flags, flags::CARRY, c);
             }
             Instr::Ror => {
-                let (mut v, c) = loc.get(self).overflowing_shr(1);
+                let (mut v, c) = overflowing_shr(loc.get(self), 1);
                 if flags::is_set(self.flags, flags::CARRY) {
                     v |= 0x80;
                 }
@@ -434,4 +434,29 @@ impl fmt::Debug for Cpu {
         write!(f, "y: ${:02x}", self.y)?;
         Ok(())
     }
+}
+
+/// The standard library `overflowing_shl` behaviour isn't what I expected, so
+/// we write our own that does what we want.
+///
+/// The (weird) behaviour of std::u8::overflowing_shl is:
+/// ```
+/// assert_eq!(0x80_u8.overflowing_shl(1), (0, false)); // ???
+/// assert_eq!(0x55_u8.overflowing_shl(0x81), (0xaa, true)); // I mean, sure?
+/// ```
+fn overflowing_shl(x: u8, shift_amount: u8) -> (u8, bool) {
+    assert!(shift_amount < 8);
+    let out = x << shift_amount;
+    let overflow = out.count_ones() != x.count_ones();
+    (out, overflow)
+}
+
+/// Returns true if any of the bits got shifted off the end.
+///
+/// See also `overflowing_shl`.
+fn overflowing_shr(x: u8, shift_amount: u8) -> (u8, bool) {
+    assert!(shift_amount < 8);
+    let out = x >> shift_amount;
+    let overflow = out.count_ones() != x.count_ones();
+    (out, overflow)
 }
