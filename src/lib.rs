@@ -63,9 +63,10 @@ impl Cpu {
             }
 
             // // """breakpoint"""
-            // if self.pc == 0x22df && self.x == 3 {
+            // if self.pc == 0x35e3 {
             //     enable_debugger = true;
             // }
+            // // (currently halting at $35ef)
 
             // todo: hacky "single-step debugger", for testing
             if enable_debugger {
@@ -356,15 +357,8 @@ impl Cpu {
 
     #[must_use]
     fn adc(&mut self, a: u8, v: u8) -> u8 {
-        let mut sum = 0u16;
-        sum += a as u16;
-        sum += v as u16;
-        if flags::is_set(self.flags, flags::CARRY) {
-            sum += 1;
-        }
-
-        let carry = sum >= 0x0100;
-        let sum = sum as u8;
+        let carry_in = flags::is_set(self.flags, flags::CARRY);
+        let (sum, carry_out) = add_with_carry(a, v, carry_in);
 
         let overflow = {
             let same_sign = a & 0x80 == v & 0x80;
@@ -372,35 +366,24 @@ impl Cpu {
             same_sign && flipped
         };
 
-        flags::set_to(&mut self.flags, flags::CARRY, carry);
+        flags::set_to(&mut self.flags, flags::CARRY, carry_out);
         flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
         self.nz(sum)
     }
 
-    // todo: this needs a major refactor. (Maybe we make it a function w/o side
-    // effects, that returns a result alongside various flags?)
+    // todo: refactor this; probably share code with adc
     #[must_use]
     fn sbc(&mut self, a: u8, v: u8, affects_overflow_flag: bool) -> u8 {
-        let neg_v = (v as i8).wrapping_mul(-1) as u8;
-
-        let mut sum: u16 = 0;
-        sum += a as u16;
-        sum += neg_v as u16;
-        if !flags::is_set(self.flags, flags::CARRY) {
-            sum = sum.wrapping_sub(1);
-        }
-
-        // todo: re-write this somehow so there's no need for the special case sum=0.
-        let carry = sum >= 0x0100 || sum == 0;
-        let sum = sum as u8;
+        let carry_in = flags::is_set(self.flags, flags::CARRY);
+        let (sum, carry_out) = add_with_carry(a, !v, carry_in);
 
         let overflow = {
-            let same_sign = a & 0x80 == neg_v & 0x80;
+            let same_sign = a & 0x80 == !v & 0x80;
             let flipped = sum & 0x80 != a & 0x80;
             same_sign && flipped
         };
 
-        flags::set_to(&mut self.flags, flags::CARRY, carry);
+        flags::set_to(&mut self.flags, flags::CARRY, carry_out);
         if affects_overflow_flag {
             flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
         }
@@ -434,6 +417,17 @@ impl fmt::Debug for Cpu {
         write!(f, "y: ${:02x}", self.y)?;
         Ok(())
     }
+}
+
+fn add_with_carry(x: u8, y: u8, carry_in: bool) -> (u8, bool) {
+    let (s1, c1) = x.overflowing_add(y);
+    if !carry_in {
+        return (s1, c1);
+    }
+
+    let (s2, c2) = s1.overflowing_add(1);
+    debug_assert!(!(c1 && c2));
+    (s2, c1 || c2)
 }
 
 /// The standard library `overflowing_shl` behaviour isn't what I expected, so
