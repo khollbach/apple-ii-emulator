@@ -381,7 +381,7 @@ impl Cpu {
     // effects, that returns a result alongside various flags?)
     #[must_use]
     fn sbc(&mut self, a: u8, v: u8, affects_overflow_flag: bool) -> u8 {
-        let neg_v = (v as i8 * -1) as u8;
+        let neg_v = (v as i8).wrapping_mul(-1) as u8;
 
         let mut sum: u16 = 0;
         sum += a as u16;

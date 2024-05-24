@@ -55,8 +55,10 @@ currently debugging via this test suite:
 * https://github.com/Klaus2m5/6502_65C02_functional_tests/blob/master/6502_functional_test.a65
 * left off at $09cf (break & return from interrupt)
     * should we test these now, or come back to them?
-* see:
-    /home/kevan/code/play/6502_65C02_functional_tests/tmp/assembled-with-extra-flags/6502_functional_test.lst
+* currently using these files to test:
+    /home/kevan/code/play/6502_65C02_functional_tests/tmp/assembled-without-brk/6502_functional_test.bin
+    /home/kevan/code/play/6502_65C02_functional_tests/tmp/assembled-without-brk/6502_functional_test.lst
+
 
 ---
 
