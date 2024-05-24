@@ -63,7 +63,7 @@ impl Cpu {
             }
 
             // // """breakpoint"""
-            // if self.pc == 0x08fc {
+            // if self.pc == 0x1bb1 {
             //     enable_debugger = true;
             // }
 
@@ -261,8 +261,8 @@ impl Cpu {
 
             Instr::Bit => {
                 let v = loc.get(self);
-                flags::set_to(&mut self.flags, flags::NEGATIVE, v >= 0x80);
-                flags::set_to(&mut self.flags, flags::OVERFLOW, v >= 0x40);
+                flags::set_to(&mut self.flags, flags::NEGATIVE, v & 0x80 != 0); // todo: introduce a bitset API?
+                flags::set_to(&mut self.flags, flags::OVERFLOW, v & 0x40 != 0);
                 flags::set_to(&mut self.flags, flags::ZERO, (v & self.a) == 0);
             }
 
