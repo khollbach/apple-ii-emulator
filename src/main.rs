@@ -17,7 +17,9 @@ fn main() {
 
     let mut ram = vec![0; MEM_LEN];
     // ram[0x0a..].copy_from_slice(&prog);
-    ram[0x0a..=0x3848].copy_from_slice(&prog);
+    // ram[0x0a..=0x3848].copy_from_slice(&prog);
+    ram[0x0a..=0x3618].copy_from_slice(&prog);
+
 
     let cpu = Cpu::new(ram).run_until_halt(0x0400);
     eprintln!("{:?}", cpu);
