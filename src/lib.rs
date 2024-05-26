@@ -43,7 +43,7 @@ impl Cpu {
         }
     }
 
-    fn step(&mut self) {
+    pub fn step(&mut self) {
         let (instr, mode) = opcode::decode(self.get_byte(self.pc));
 
         let loc = Operand::from_mode(self, mode);

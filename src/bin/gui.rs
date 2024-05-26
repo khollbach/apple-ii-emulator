@@ -1,6 +1,8 @@
-use std::{error::Error, rc::Rc, thread, time::Duration};
+use std::{env, error::Error, fs::File, io::prelude::*, rc::Rc, thread, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
+use apple_ii_emulator::{Cpu, MEM_LEN};
+use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
 use winit::{
     application::ApplicationHandler,
@@ -18,11 +20,37 @@ const DESIRED_WINDOW_SIZE: PhysicalSize<u32> = {
 };
 
 fn main() -> Result<()> {
+    let (filename,) = env::args()
+        .skip(1)
+        .collect_tuple()
+        .context("expected 1 argument")?;
+    let mut file = File::open(&filename).context("failed opening file")?;
+
+    let mut prog = vec![];
+    file.read_to_end(&mut prog).context("failed reading file")?;
+
+    let mut ram = vec![0; MEM_LEN];
+    ram[0x2000..][..prog.len()].copy_from_slice(&prog);
+    let mut cpu = Cpu::new(ram);
+    cpu.pc = 0x2000;
+
     let event_loop = EventLoop::new()?;
+
+    // todo: problem:
+    // * seems we can't send events every microsecond and have them get handled in time;
+    //      probably, the channel we're sending over doesn't have that kind of throughput.
+    // I guess we have to think of another way to do this!
 
     // Step the CPU every 1 microsecond. In other words, run at 1MHz.
     let event_tx = event_loop.create_proxy();
+    // let mut i = 0;
     thread::spawn(move || loop {
+        // // let m = 1_000_000;
+        // let m = 10_000;
+        // i += 1;
+        // if i % m == 0 {
+        //     dbg!(i / m);
+        // }
         thread::sleep(Duration::from_micros(1));
         match event_tx.send_event(()) {
             Ok(()) => (),
@@ -30,8 +58,7 @@ fn main() -> Result<()> {
         }
     });
 
-    let mut app = App::new();
-    event_loop.run_app(&mut app)?;
+    event_loop.run_app(&mut App::new(cpu))?;
 
     Ok(())
 }
@@ -41,17 +68,17 @@ struct App {
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     occluded: bool,
     window_size: PhysicalSize<u32>,
-    toy_state: bool,
+    cpu: Cpu,
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(cpu: Cpu) -> Self {
         Self {
             window: None,
             surface: None,
             occluded: false,
             window_size: DESIRED_WINDOW_SIZE,
-            toy_state: false,
+            cpu,
         }
     }
 
@@ -77,7 +104,7 @@ impl App {
         event_loop: &ActiveEventLoop,
         event: WindowEvent,
     ) -> StdResult<(), SoftBufferError> {
-        let window = self.window.as_mut().unwrap();
+        let window = self.window.as_ref().unwrap();
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -104,15 +131,6 @@ impl App {
                 }
             }
 
-            WindowEvent::KeyboardInput {
-                device_id: _,
-                event: _,
-                is_synthetic: _,
-            } => {
-                self.toy_state ^= true;
-                window.request_redraw();
-            }
-
             _ => (),
         }
 
@@ -128,21 +146,25 @@ impl App {
             self.window_size.height.try_into().unwrap_or(one),
         )?;
 
+        // For now, paint the entire screen, indicating whether the byte at $400
+        // is non-zero.
         let mut buf = surface.buffer_mut()?;
-        if self.toy_state {
-            buf.fill(0xffff_ffff);
+        let color: u32 = if self.cpu.ram[0x400] != 0 {
+            0x_00ff_ffff
         } else {
-            buf.fill(0);
+            0
         };
+        buf.fill(color);
 
-        self.window.as_mut().unwrap().pre_present_notify();
+        self.window.as_ref().unwrap().pre_present_notify();
         buf.present()?;
 
         Ok(())
     }
 
     fn tick(&mut self) {
-        // todo
+        self.cpu.step();
+        self.window.as_ref().unwrap().request_redraw();
     }
 }
 

@@ -6,5 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 hex = "0.4.3"
+itertools = "0.13.0"
 softbuffer = "0.4.3"
 winit = "0.30.0"
