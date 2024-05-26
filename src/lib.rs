@@ -135,7 +135,7 @@ impl Cpu {
     }
 
     fn step(&mut self) {
-        let (instr, mode) = opcode::decode(self.ram[self.pc as usize]);
+        let (instr, mode) = opcode::decode(self.get_byte(self.pc));
 
         let loc = Operand::from_mode(self, mode);
 
@@ -150,9 +150,9 @@ impl Cpu {
             Instr::Txa => self.a = self.nz(self.x),
             Instr::Tay => self.y = self.nz(self.a),
             Instr::Tya => self.a = self.nz(self.y),
-
             Instr::Txs => self.sp = self.x,
             Instr::Tsx => self.x = self.nz(self.sp),
+
             Instr::Pha => self.push(self.a),
             Instr::Pla => {
                 let v = self.pop();
@@ -194,18 +194,9 @@ impl Cpu {
             Instr::Cld => self.flags.clear(Flag::Decimal),
             Instr::Sed => self.flags.set(Flag::Decimal),
 
-            Instr::And => {
-                self.a &= loc.get(self);
-                self.nz(self.a);
-            }
-            Instr::Ora => {
-                self.a |= loc.get(self);
-                self.nz(self.a);
-            }
-            Instr::Eor => {
-                self.a ^= loc.get(self);
-                self.nz(self.a);
-            }
+            Instr::And => self.a = self.nz(self.a & loc.get(self)),
+            Instr::Ora => self.a = self.nz(self.a | loc.get(self)),
+            Instr::Eor => self.a = self.nz(self.a ^ loc.get(self)),
 
             Instr::Adc => {
                 let v = loc.get(self);

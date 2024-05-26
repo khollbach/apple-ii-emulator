@@ -63,10 +63,10 @@ currently debugging via this test suite:
 ---
 
 [x] todo: maybe refactor flags helpers somehow for more concise callsites
-todo: maybe review the "nz" approach and consider if you like it.
+[x] todo: maybe review the "nz" approach and consider if you like it.
+todo: look into refactoring adc and sbc to share code
 todo: maybe refactor instr execution into a module with a bunch of
         shared state wrapped up in an object
-todo: look into refactoring adc and sbc to share code
 todo: I might not be using the same terminology as the reference:
         I think they're using "operand" to mean the "mode argument".
         Maybe we should re-name operand to location? (or something?)
