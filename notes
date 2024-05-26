@@ -71,5 +71,5 @@ currently debugging via this test suite:
 [x] look into refactoring adc and sbc to share code
 [nah] maybe refactor instr execution into a module with a bunch of
         shared state wrapped up in an object
-[ ] look at refactoring shift operations impls
+[x] look at refactoring shift operations impls
 

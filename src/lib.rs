@@ -114,35 +114,15 @@ impl Cpu {
             Instr::Cpy => self.cmp(self.y, loc.get(self)),
 
             Instr::Asl => {
-                let (v, c) = overflowing_shl(loc.get(self), 1);
-                loc.set(self, v);
-                self.nz(v);
-                self.flags.assign(Flag::Carry, c);
+                self.flags.clear(Flag::Carry);
+                self.rol(loc);
             }
             Instr::Lsr => {
-                let (v, c) = overflowing_shr(loc.get(self), 1);
-                loc.set(self, v);
-                self.nz(v);
-                self.flags.assign(Flag::Carry, c);
+                self.flags.clear(Flag::Carry);
+                self.ror(loc);
             }
-            Instr::Rol => {
-                let (mut v, c) = overflowing_shl(loc.get(self), 1);
-                if self.flags.is_set(Flag::Carry) {
-                    v |= 1;
-                }
-                loc.set(self, v);
-                self.nz(v);
-                self.flags.assign(Flag::Carry, c);
-            }
-            Instr::Ror => {
-                let (mut v, c) = overflowing_shr(loc.get(self), 1);
-                if self.flags.is_set(Flag::Carry) {
-                    v |= 0x80;
-                }
-                loc.set(self, v);
-                self.nz(v);
-                self.flags.assign(Flag::Carry, c);
-            }
+            Instr::Rol => self.rol(loc),
+            Instr::Ror => self.ror(loc),
 
             Instr::Bit => {
                 let v = loc.get(self);
@@ -245,6 +225,26 @@ impl Cpu {
         let ret = addition(arg1, !arg2, true);
         self.nz(ret.sum);
         self.flags.assign(Flag::Carry, ret.carry);
+    }
+
+    fn rol(&mut self, loc: Operand) {
+        let (mut v, c) = overflowing_shl(loc.get(self), 1);
+        if self.flags.is_set(Flag::Carry) {
+            v |= 1;
+        }
+        loc.set(self, v);
+        self.nz(v);
+        self.flags.assign(Flag::Carry, c);
+    }
+
+    fn ror(&mut self, loc: Operand) {
+        let (mut v, c) = overflowing_shr(loc.get(self), 1);
+        if self.flags.is_set(Flag::Carry) {
+            v |= 0x80;
+        }
+        loc.set(self, v);
+        self.nz(v);
+        self.flags.assign(Flag::Carry, c);
     }
 
     fn would_branch(&self, branch: Instr) -> bool {
