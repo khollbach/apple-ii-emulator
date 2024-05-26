@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.86"
 hex = "0.4.3"
+softbuffer = "0.4.3"
+winit = "0.30.0"
