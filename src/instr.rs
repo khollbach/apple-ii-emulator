@@ -82,11 +82,8 @@ pub enum Mode {
 }
 
 impl Mode {
-    pub fn instr_len(self) -> u16 {
-        1 + self.arg_len()
-    }
-
-    fn arg_len(self) -> u16 {
+    /// How many bytes long is this instruction, *not* including the opcode.
+    pub fn arg_len(self) -> u16 {
         match self {
             Mode::Implied => 0,
             Mode::Accumulator => 0,
@@ -98,7 +95,7 @@ impl Mode {
             Mode::ZeroPageX => 1,
             Mode::ZeroPageY => 1,
 
-            // Note these are not the same as Indirect.
+            // Note: these are not the same as Indirect.
             Mode::XIndirect => 1,
             Mode::IndirectY => 1,
 
@@ -108,5 +105,9 @@ impl Mode {
 
             Mode::Indirect => 2,
         }
+    }
+
+    pub fn instr_len(self) -> u16 {
+        1 + self.arg_len()
     }
 }

@@ -10,79 +10,53 @@ pub enum Operand {
 
 impl Operand {
     pub fn from_mode(cpu: &Cpu, mode: Mode) -> Self {
+        let arg: u16 = match mode.arg_len() {
+            0 => 0,
+            1 => cpu.get_byte(cpu.pc.checked_add(1).unwrap()).into(),
+            2 => cpu.get_word(cpu.pc.checked_add(1).unwrap()),
+            _ => unreachable!(),
+        };
+
         match mode {
             Mode::Implied => Self::None,
             Mode::Accumulator => Self::Accumulator,
-
-            Mode::Immediate => {
-                let value = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                Self::Literal { value }
-            }
+            Mode::Immediate => Self::Literal { value: arg as u8 },
 
             Mode::Relative => {
-                let value = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                let offset = value as i8 as i16;
                 // Note: branch offset is relative to the *next* instruction,
                 // not the current one.
-                //
-                // todo: detect under/overflow and panic
-                let addr = cpu.pc.wrapping_add(2).wrapping_add(offset as u16);
-                Self::Memory { addr }
+                let base = cpu.pc.checked_add(2).unwrap();
+                let offset = arg as u8 as i8;
+                Self::Memory {
+                    addr: checked_offset(base, offset).unwrap(),
+                }
             }
 
-            Mode::ZeroPage => {
-                let lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                let addr = u16::from_le_bytes([lo, 0]);
-                Self::Memory { addr }
-            }
-            Mode::ZeroPageX => {
-                let mut lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                lo = lo.wrapping_add(cpu.x);
-                let addr = u16::from_le_bytes([lo, 0]);
-                Self::Memory { addr }
-            }
-            Mode::ZeroPageY => {
-                let mut lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                lo = lo.wrapping_add(cpu.y);
-                let addr = u16::from_le_bytes([lo, 0]);
-                Self::Memory { addr }
-            }
+            Mode::ZeroPage => Self::Memory { addr: arg },
+            Mode::ZeroPageX => Self::Memory {
+                addr: (arg as u8).wrapping_add(cpu.x).into(),
+            },
+            Mode::ZeroPageY => Self::Memory {
+                addr: (arg as u8).wrapping_add(cpu.y).into(),
+            },
 
-            Mode::Absolute => {
-                let addr = cpu.get_word(cpu.pc.checked_add(1).unwrap());
-                Self::Memory { addr }
-            }
-            Mode::AbsoluteX => {
-                let mut addr = cpu.get_word(cpu.pc.checked_add(1).unwrap());
-                addr = addr.checked_add(cpu.x as u16).unwrap();
-                Self::Memory { addr }
-            }
-            Mode::AbsoluteY => {
-                let mut addr = cpu.get_word(cpu.pc.checked_add(1).unwrap());
-                addr = addr.checked_add(cpu.y as u16).unwrap();
-                Self::Memory { addr }
-            }
+            Mode::Absolute => Self::Memory { addr: arg },
+            Mode::AbsoluteX => Self::Memory {
+                addr: arg.checked_add(cpu.x as u16).unwrap(),
+            },
+            Mode::AbsoluteY => Self::Memory {
+                addr: arg.checked_add(cpu.y as u16).unwrap(),
+            },
 
-            Mode::Indirect => {
-                let pointer = cpu.get_word(cpu.pc.checked_add(1).unwrap());
-                let addr = cpu.get_word(pointer);
-                Self::Memory { addr }
-            }
-
-            Mode::XIndirect => {
-                let mut lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                lo = lo.wrapping_add(cpu.x);
-                let pointer = u16::from_le_bytes([lo, 0]);
-                let addr = cpu.get_word(pointer);
-                Self::Memory { addr }
-            }
-            Mode::IndirectY => {
-                let lo = cpu.get_byte(cpu.pc.checked_add(1).unwrap());
-                let pointer = u16::from_le_bytes([lo, 0]);
-                let mut addr = cpu.get_word(pointer);
-                addr = addr.checked_add(cpu.y as u16).unwrap();
-                Self::Memory { addr }
-            }
+            Mode::Indirect => Self::Memory {
+                addr: cpu.get_word(arg),
+            },
+            Mode::XIndirect => Self::Memory {
+                addr: cpu.get_word((arg as u8).wrapping_add(cpu.x) as u16),
+            },
+            Mode::IndirectY => Self::Memory {
+                addr: cpu.get_word(arg).checked_add(cpu.y as u16).unwrap(),
+            },
         }
     }
 
@@ -110,4 +84,13 @@ impl Operand {
             _ => panic!("operand doesn't have a memory address: {self:?}"),
         }
     }
+}
+
+fn checked_offset(addr: u16, offset: i8) -> Option<u16> {
+    if offset >= 0 {
+        return addr.checked_add(offset as u16);
+    }
+
+    let abs_offset = (offset as i16).abs() as u16;
+    addr.checked_sub(abs_offset)
 }
