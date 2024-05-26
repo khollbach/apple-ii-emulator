@@ -198,27 +198,11 @@ impl Cpu {
             Instr::Ora => self.a = self.nz(self.a | loc.get(self)),
             Instr::Eor => self.a = self.nz(self.a ^ loc.get(self)),
 
-            Instr::Adc => {
-                let v = loc.get(self);
-                self.a = self.adc(self.a, v);
-            }
-            Instr::Sbc => {
-                let v = loc.get(self);
-                self.a = self.sbc(self.a, v, true);
-            }
-
-            Instr::Cmp => {
-                self.flags.set(Flag::Carry);
-                let _ = self.sbc(self.a, loc.get(self), false);
-            }
-            Instr::Cpx => {
-                self.flags.set(Flag::Carry);
-                let _ = self.sbc(self.x, loc.get(self), false);
-            }
-            Instr::Cpy => {
-                self.flags.set(Flag::Carry);
-                let _ = self.sbc(self.y, loc.get(self), false);
-            }
+            Instr::Adc => self.adc(self.a, loc.get(self)),
+            Instr::Sbc => self.adc(self.a, !loc.get(self)),
+            Instr::Cmp => self.cmp(self.a, loc.get(self)),
+            Instr::Cpx => self.cmp(self.x, loc.get(self)),
+            Instr::Cpy => self.cmp(self.y, loc.get(self)),
 
             Instr::Asl => {
                 let (v, c) = overflowing_shl(loc.get(self), 1);
@@ -272,19 +256,14 @@ impl Cpu {
             }
 
             Instr::Jmp => self.pc = loc.addr(),
-
             Instr::Jsr => {
                 let return_addr_minus_one = curr_pc.checked_add(2).unwrap();
                 self.push2(return_addr_minus_one);
-
                 self.pc = loc.addr();
             }
-
             Instr::Rts => self.pc = self.pop2().checked_add(1).unwrap(),
-
             Instr::Rti => {
                 self.flags.bits = self.pop();
-
                 // Note that unlike RTS, there is no off-by-one here.
                 self.pc = self.pop2();
             }
@@ -309,7 +288,7 @@ impl Cpu {
     /// Push to the stack.
     fn push(&mut self, value: u8) {
         let addr = 0x0100 + self.sp as u16;
-        self.ram[addr as usize] = value;
+        self.set_byte(addr, value);
         self.sp = self.sp.wrapping_sub(1);
     }
 
@@ -317,7 +296,7 @@ impl Cpu {
     fn pop(&mut self) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         let addr = 0x0100 + self.sp as u16;
-        self.ram[addr as usize]
+        self.get_byte(addr)
     }
 
     /// Push a word to the stack.
@@ -346,39 +325,17 @@ impl Cpu {
         value
     }
 
-    #[must_use]
-    fn adc(&mut self, a: u8, v: u8) -> u8 {
-        let carry_in = self.flags.is_set(Flag::Carry);
-        let (sum, carry_out) = add_with_carry(a, v, carry_in);
-
-        let overflow = {
-            let same_sign = a & 0x80 == v & 0x80;
-            let flipped = sum & 0x80 != a & 0x80;
-            same_sign && flipped
-        };
-
-        self.flags.assign(Flag::Carry, carry_out);
-        self.flags.assign(Flag::Overflow, overflow);
-        self.nz(sum)
+    fn adc(&mut self, arg1: u8, arg2: u8) {
+        let ret = addition(arg1, arg2, self.flags.is_set(Flag::Carry));
+        self.a = self.nz(ret.sum);
+        self.flags.assign(Flag::Carry, ret.carry);
+        self.flags.assign(Flag::Overflow, ret.overflow);
     }
 
-    // todo: refactor this; probably share code with adc
-    #[must_use]
-    fn sbc(&mut self, a: u8, v: u8, affects_overflow_flag: bool) -> u8 {
-        let carry_in = self.flags.is_set(Flag::Carry);
-        let (sum, carry_out) = add_with_carry(a, !v, carry_in);
-
-        let overflow = {
-            let same_sign = a & 0x80 == !v & 0x80;
-            let flipped = sum & 0x80 != a & 0x80;
-            same_sign && flipped
-        };
-
-        self.flags.assign(Flag::Carry, carry_out);
-        if affects_overflow_flag {
-            self.flags.assign(Flag::Overflow, overflow);
-        }
-        self.nz(sum)
+    fn cmp(&mut self, arg1: u8, arg2: u8) {
+        let ret = addition(arg1, !arg2, true);
+        self.nz(ret.sum);
+        self.flags.assign(Flag::Carry, ret.carry);
     }
 
     fn would_branch(&self, branch: Instr) -> bool {
@@ -408,6 +365,29 @@ impl fmt::Debug for Cpu {
         write!(f, "y: ${:02x}", self.y)?;
         Ok(())
     }
+}
+
+/// Perform addition, detecting signed integer overflows.
+fn addition(x: u8, y: u8, carry_in: bool) -> Addition {
+    let (sum, carry_out) = add_with_carry(x, y, carry_in);
+
+    let overflow = {
+        let same_sign = x & 0x80 == y & 0x80;
+        let flipped = sum & 0x80 != x & 0x80;
+        same_sign && flipped
+    };
+
+    Addition {
+        sum,
+        carry: carry_out,
+        overflow,
+    }
+}
+
+struct Addition {
+    sum: u8,
+    carry: bool,
+    overflow: bool,
 }
 
 fn add_with_carry(x: u8, y: u8, carry_in: bool) -> (u8, bool) {
