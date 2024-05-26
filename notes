@@ -62,7 +62,7 @@ currently debugging via this test suite:
 
 ---
 
-todo: maybe refactor flags helpers somehow for more concise callsites
+[x] todo: maybe refactor flags helpers somehow for more concise callsites
 todo: maybe review the "nz" approach and consider if you like it.
 todo: maybe refactor instr execution into a module with a bunch of
         shared state wrapped up in an object

@@ -5,6 +5,7 @@ mod operand;
 
 use std::{fmt, io};
 
+use flags::{Flag, Flags};
 use instr::{Instr, Mode};
 use operand::Operand;
 
@@ -13,7 +14,7 @@ pub const MEM_LEN: usize = 2_usize.pow(16);
 pub struct Cpu {
     pub pc: u16,
     pub sp: u8,
-    pub flags: u8,
+    pub flags: Flags,
 
     pub a: u8,
     pub x: u8,
@@ -28,7 +29,7 @@ impl Cpu {
         Self {
             pc: 0,
             sp: u8::MAX,
-            flags: 0u8,
+            flags: Flags { bits: 0 },
             a: 0,
             x: 0,
             y: 0,
@@ -130,7 +131,7 @@ impl Cpu {
         let (instr, mode) = opcode::decode(self.ram[self.pc as usize]);
         let is_branch = mode == Mode::Relative;
         let in_place = self.get_byte(self.pc.checked_add(1).unwrap()) as i8 == -2;
-        is_branch && in_place && would_branch(instr, self.flags)
+        is_branch && in_place && self.would_branch(instr)
     }
 
     fn step(&mut self) {
@@ -158,15 +159,12 @@ impl Cpu {
                 self.a = self.nz(v);
             }
             Instr::Php => {
-                let mut f = self.flags;
-                flags::set(&mut f, flags::BREAK);
-                flags::set(&mut f, flags::RESERVED);
-                self.push(f);
+                let mut f = self.flags.clone();
+                f.set(Flag::Break);
+                f.set(Flag::Reserved);
+                self.push(f.bits);
             }
-            Instr::Plp => {
-                let v = self.pop();
-                self.flags = self.nz(v);
-            }
+            Instr::Plp => self.flags.bits = self.pop(),
 
             Instr::Lda => self.a = self.nz(loc.get(self)),
             Instr::Ldx => self.x = self.nz(loc.get(self)),
@@ -188,13 +186,13 @@ impl Cpu {
                 loc.set(self, v);
             }
 
-            Instr::Clc => flags::clear(&mut self.flags, flags::CARRY),
-            Instr::Sec => flags::set(&mut self.flags, flags::CARRY),
-            Instr::Cli => flags::clear(&mut self.flags, flags::INTERRUPT),
-            Instr::Sei => flags::set(&mut self.flags, flags::INTERRUPT),
-            Instr::Clv => flags::clear(&mut self.flags, flags::OVERFLOW),
-            Instr::Cld => flags::clear(&mut self.flags, flags::DECIMAL),
-            Instr::Sed => flags::set(&mut self.flags, flags::DECIMAL),
+            Instr::Clc => self.flags.clear(Flag::Carry),
+            Instr::Sec => self.flags.set(Flag::Carry),
+            Instr::Cli => self.flags.clear(Flag::Interrupt),
+            Instr::Sei => self.flags.set(Flag::Interrupt),
+            Instr::Clv => self.flags.clear(Flag::Overflow),
+            Instr::Cld => self.flags.clear(Flag::Decimal),
+            Instr::Sed => self.flags.set(Flag::Decimal),
 
             Instr::And => {
                 self.a &= loc.get(self);
@@ -219,15 +217,15 @@ impl Cpu {
             }
 
             Instr::Cmp => {
-                flags::set(&mut self.flags, flags::CARRY);
+                self.flags.set(Flag::Carry);
                 let _ = self.sbc(self.a, loc.get(self), false);
             }
             Instr::Cpx => {
-                flags::set(&mut self.flags, flags::CARRY);
+                self.flags.set(Flag::Carry);
                 let _ = self.sbc(self.x, loc.get(self), false);
             }
             Instr::Cpy => {
-                flags::set(&mut self.flags, flags::CARRY);
+                self.flags.set(Flag::Carry);
                 let _ = self.sbc(self.y, loc.get(self), false);
             }
 
@@ -235,36 +233,38 @@ impl Cpu {
                 let (v, c) = overflowing_shl(loc.get(self), 1);
                 loc.set(self, v);
                 self.nz(v);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
+                self.flags.assign(Flag::Carry, c);
             }
             Instr::Lsr => {
                 let (v, c) = overflowing_shr(loc.get(self), 1);
                 loc.set(self, v);
                 self.nz(v);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
+                self.flags.assign(Flag::Carry, c);
             }
             Instr::Rol => {
                 let (mut v, c) = overflowing_shl(loc.get(self), 1);
-                v |= flags::is_set(self.flags, flags::CARRY) as u8;
+                if self.flags.is_set(Flag::Carry) {
+                    v |= 1;
+                }
                 loc.set(self, v);
                 self.nz(v);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
+                self.flags.assign(Flag::Carry, c);
             }
             Instr::Ror => {
                 let (mut v, c) = overflowing_shr(loc.get(self), 1);
-                if flags::is_set(self.flags, flags::CARRY) {
+                if self.flags.is_set(Flag::Carry) {
                     v |= 0x80;
                 }
                 loc.set(self, v);
                 self.nz(v);
-                flags::set_to(&mut self.flags, flags::CARRY, c);
+                self.flags.assign(Flag::Carry, c);
             }
 
             Instr::Bit => {
                 let v = loc.get(self);
-                flags::set_to(&mut self.flags, flags::NEGATIVE, v & 0x80 != 0); // todo: introduce a bitset API?
-                flags::set_to(&mut self.flags, flags::OVERFLOW, v & 0x40 != 0);
-                flags::set_to(&mut self.flags, flags::ZERO, (v & self.a) == 0);
+                self.flags.assign(Flag::Negative, v & 0x80 != 0);
+                self.flags.assign(Flag::Overflow, v & 0x40 != 0);
+                self.flags.assign(Flag::Zero, (v & self.a) == 0);
             }
 
             b @ (Instr::Bpl
@@ -275,7 +275,7 @@ impl Cpu {
             | Instr::Bcs
             | Instr::Bne
             | Instr::Beq) => {
-                if would_branch(b, self.flags) {
+                if self.would_branch(b) {
                     self.pc = loc.addr();
                 }
             }
@@ -292,7 +292,7 @@ impl Cpu {
             Instr::Rts => self.pc = self.pop2().checked_add(1).unwrap(),
 
             Instr::Rti => {
-                self.flags = self.pop();
+                self.flags.bits = self.pop();
 
                 // Note that unlike RTS, there is no off-by-one here.
                 self.pc = self.pop2();
@@ -350,14 +350,14 @@ impl Cpu {
     ///
     /// Return the value, for convenience.
     fn nz(&mut self, value: u8) -> u8 {
-        flags::set_to(&mut self.flags, flags::ZERO, value == 0);
-        flags::set_to(&mut self.flags, flags::NEGATIVE, (value as i8) < 0);
+        self.flags.assign(Flag::Zero, value == 0);
+        self.flags.assign(Flag::Negative, (value as i8) < 0);
         value
     }
 
     #[must_use]
     fn adc(&mut self, a: u8, v: u8) -> u8 {
-        let carry_in = flags::is_set(self.flags, flags::CARRY);
+        let carry_in = self.flags.is_set(Flag::Carry);
         let (sum, carry_out) = add_with_carry(a, v, carry_in);
 
         let overflow = {
@@ -366,15 +366,15 @@ impl Cpu {
             same_sign && flipped
         };
 
-        flags::set_to(&mut self.flags, flags::CARRY, carry_out);
-        flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+        self.flags.assign(Flag::Carry, carry_out);
+        self.flags.assign(Flag::Overflow, overflow);
         self.nz(sum)
     }
 
     // todo: refactor this; probably share code with adc
     #[must_use]
     fn sbc(&mut self, a: u8, v: u8, affects_overflow_flag: bool) -> u8 {
-        let carry_in = flags::is_set(self.flags, flags::CARRY);
+        let carry_in = self.flags.is_set(Flag::Carry);
         let (sum, carry_out) = add_with_carry(a, !v, carry_in);
 
         let overflow = {
@@ -383,34 +383,34 @@ impl Cpu {
             same_sign && flipped
         };
 
-        flags::set_to(&mut self.flags, flags::CARRY, carry_out);
+        self.flags.assign(Flag::Carry, carry_out);
         if affects_overflow_flag {
-            flags::set_to(&mut self.flags, flags::OVERFLOW, overflow);
+            self.flags.assign(Flag::Overflow, overflow);
         }
         self.nz(sum)
     }
-}
 
-fn would_branch(branch: Instr, cpu_flags: u8) -> bool {
-    let (flag, when) = match branch {
-        Instr::Bpl => (flags::NEGATIVE, false),
-        Instr::Bmi => (flags::NEGATIVE, true),
-        Instr::Bvc => (flags::OVERFLOW, false),
-        Instr::Bvs => (flags::OVERFLOW, true),
-        Instr::Bcc => (flags::CARRY, false),
-        Instr::Bcs => (flags::CARRY, true),
-        Instr::Bne => (flags::ZERO, false),
-        Instr::Beq => (flags::ZERO, true),
-        _ => panic!("not a branch: {branch:?}"),
-    };
-    flags::is_set(cpu_flags, flag) == when
+    fn would_branch(&self, branch: Instr) -> bool {
+        let (flag, when) = match branch {
+            Instr::Bpl => (Flag::Negative, false),
+            Instr::Bmi => (Flag::Negative, true),
+            Instr::Bvc => (Flag::Overflow, false),
+            Instr::Bvs => (Flag::Overflow, true),
+            Instr::Bcc => (Flag::Carry, false),
+            Instr::Bcs => (Flag::Carry, true),
+            Instr::Bne => (Flag::Zero, false),
+            Instr::Beq => (Flag::Zero, true),
+            _ => panic!("not a branch: {branch:?}"),
+        };
+        self.flags.is_set(flag) == when
+    }
 }
 
 impl fmt::Debug for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pc: ${:04x}", self.pc)?;
         writeln!(f, "sp: ${:02x}", self.sp)?;
-        writeln!(f, "flags: {:08b}", self.flags)?;
+        writeln!(f, "flags: {:08b}", self.flags.bits)?;
         writeln!(f, "       NV-BDIZC")?;
         writeln!(f, "a: ${:02x}", self.a)?;
         writeln!(f, "x: ${:02x}", self.x)?;

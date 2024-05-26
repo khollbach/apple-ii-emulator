@@ -1,32 +1,39 @@
-pub const CARRY: u8 = 1 << 0;
-pub const ZERO: u8 = 1 << 1;
-pub const INTERRUPT: u8 = 1 << 2;
-pub const DECIMAL: u8 = 1 << 3;
+#[repr(u8)]
+pub enum Flag {
+    Carry = 1 << 0,
+    Zero = 1 << 1,
+    Interrupt = 1 << 2,
+    Decimal = 1 << 3,
 
-pub const BREAK: u8 = 1 << 4;
-pub const RESERVED: u8 = 1 << 5;
-pub const OVERFLOW: u8 = 1 << 6;
-pub const NEGATIVE: u8 = 1 << 7;
-
-pub fn set(flags: &mut u8, flag: u8) {
-    assert_eq!(flag.count_ones(), 1);
-    *flags |= flag;
+    Break = 1 << 4,
+    Reserved = 1 << 5,
+    Overflow = 1 << 6,
+    Negative = 1 << 7,
 }
 
-pub fn clear(flags: &mut u8, flag: u8) {
-    assert_eq!(flag.count_ones(), 1);
-    *flags &= !flag;
+#[derive(Clone)]
+pub struct Flags {
+    pub bits: u8,
 }
 
-pub fn set_to(flags: &mut u8, flag: u8, setting: bool) {
-    if setting {
-        set(flags, flag)
-    } else {
-        clear(flags, flag)
+impl Flags {
+    pub fn set(&mut self, flag: Flag) {
+        self.bits |= flag as u8;
     }
-}
 
-pub fn is_set(flags: u8, flag: u8) -> bool {
-    assert_eq!(flag.count_ones(), 1);
-    flags & flag != 0
+    pub fn clear(&mut self, flag: Flag) {
+        self.bits &= !(flag as u8);
+    }
+
+    pub fn assign(&mut self, flag: Flag, setting: bool) {
+        if setting {
+            self.set(flag)
+        } else {
+            self.clear(flag)
+        }
+    }
+
+    pub fn is_set(&self, flag: Flag) -> bool {
+        self.bits & (flag as u8) != 0
+    }
 }
