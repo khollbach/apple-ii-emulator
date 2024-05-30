@@ -6,13 +6,15 @@ impl Cpu {
     /// If the CPU would "halt" gracefully, this will return instead of looping.
     /// This can be useful for debugging.
     pub fn run_until_halt(mut self, start_addr: u16) -> Self {
-        let mut enable_debugger = false;
+        let enable_debugger = false;
 
         self.pc = start_addr;
         for i in 0.. {
             if self.would_halt() {
                 eprintln!("would halt");
-                enable_debugger = true;
+                // enable_debugger = true;
+                dbg!(i); // how many instrs did we execute?
+                return self;
             }
 
             // Detect long-running loops that aren't a simple "halt instruction".

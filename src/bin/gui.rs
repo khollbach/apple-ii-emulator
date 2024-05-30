@@ -40,17 +40,11 @@ fn main() -> Result<()> {
     // * seems we can't send events every microsecond and have them get handled in time;
     //      probably, the channel we're sending over doesn't have that kind of throughput.
     // I guess we have to think of another way to do this!
+    // * note: also the redraw-reqs aren't getting de-duped, so we need to handle that as well.
 
     // Step the CPU every 1 microsecond. In other words, run at 1MHz.
     let event_tx = event_loop.create_proxy();
-    // let mut i = 0;
     thread::spawn(move || loop {
-        // // let m = 1_000_000;
-        // let m = 10_000;
-        // i += 1;
-        // if i % m == 0 {
-        //     dbg!(i / m);
-        // }
         thread::sleep(Duration::from_micros(1));
         match event_tx.send_event(()) {
             Ok(()) => (),
