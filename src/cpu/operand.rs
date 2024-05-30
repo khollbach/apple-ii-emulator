@@ -1,4 +1,4 @@
-use crate::{instr::Mode, Cpu};
+use crate::cpu::{instr::Mode, Cpu};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Operand {

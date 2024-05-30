@@ -1,7 +1,19 @@
-use std::{env, error::Error, fs::File, io::prelude::*, rc::Rc, thread, time::Duration};
+#![allow(unused_imports)] // todo
+
+use std::{
+    env,
+    error::Error,
+    fs::File,
+    io::prelude::*,
+    ops::ControlFlow,
+    rc::Rc,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
 use anyhow::{Context as _, Result};
-use apple_ii_emulator::{Cpu, MEM_LEN};
+use apple_ii_emulator::cpu::{debugger::Debugger, Cpu, MEM_LEN};
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
 use winit::{
@@ -20,32 +32,40 @@ const DESIRED_WINDOW_SIZE: PhysicalSize<u32> = {
 };
 
 fn main() -> Result<()> {
+    // todo: accept CLI args: --load-addr --start-addr
+
     let (filename,) = env::args()
         .skip(1)
         .collect_tuple()
         .context("expected 1 argument")?;
-    let mut file = File::open(&filename).context("failed opening file")?;
+    let mut file = File::open(&filename)?;
 
     let mut prog = vec![];
-    file.read_to_end(&mut prog).context("failed reading file")?;
+    file.read_to_end(&mut prog)?;
 
     let mut ram = vec![0; MEM_LEN];
     ram[0x2000..][..prog.len()].copy_from_slice(&prog);
-    let mut cpu = Cpu::new(ram);
-    cpu.pc = 0x2000;
 
+    let cpu = Arc::new(Mutex::new(Cpu::new(ram, 0x2000)));
+    let mut debugger = Debugger::new(Arc::clone(&cpu));
+
+    thread::spawn(move || {
+        // hack: since 1 cycle != 1 instr, let's slow down a bit
+        // Could look into cycle-accuracy at some point maybe (low-prio)
+        // thread::sleep(Duration::from_millis(1));
+        thread::sleep(Duration::from_millis(3));
+
+        for _ in 0..1_000 {
+            debugger.step();
+        }
+    });
+
+    // Re-draw the screen at 60 Hz. This isn't the "right" way to do it, but
+    // it's probably fine for now. See the winit docs for more ideas.
     let event_loop = EventLoop::new()?;
-
-    // todo: problem:
-    // * seems we can't send events every microsecond and have them get handled in time;
-    //      probably, the channel we're sending over doesn't have that kind of throughput.
-    // I guess we have to think of another way to do this!
-    // * note: also the redraw-reqs aren't getting de-duped, so we need to handle that as well.
-
-    // Step the CPU every 1 microsecond. In other words, run at 1MHz.
     let event_tx = event_loop.create_proxy();
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_micros(1));
+        thread::sleep(Duration::from_secs_f64(1. / 60.));
         match event_tx.send_event(()) {
             Ok(()) => (),
             Err(EventLoopClosed(())) => return,
@@ -62,11 +82,11 @@ struct App {
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     occluded: bool,
     window_size: PhysicalSize<u32>,
-    cpu: Cpu,
+    cpu: Arc<Mutex<Cpu>>,
 }
 
 impl App {
-    fn new(cpu: Cpu) -> Self {
+    fn new(cpu: Arc<Mutex<Cpu>>) -> Self {
         Self {
             window: None,
             surface: None,
@@ -132,6 +152,18 @@ impl App {
     }
 
     fn redraw(&mut self) -> StdResult<(), SoftBufferError> {
+        // We probably don't need to clone the whole 64KiB ram, but this seems
+        // fine for now.
+        let cpu = self.cpu.lock().unwrap().clone();
+        // eprintln!("\n{:?}", cpu);
+
+        // TODO:
+        // * debug test prog not blinking the screen any more
+        // * then commit what we have so far and start thinking about the wobbly
+        //      tunnel demo / GR display mode
+        // * maybe could impl a text-based dump of screen memory as a starting
+        //      point, before going to actual graphics
+
         let surface = self.surface.as_mut().unwrap();
 
         let one = 1.try_into().unwrap();
@@ -143,22 +175,13 @@ impl App {
         // For now, paint the entire screen, indicating whether the byte at $400
         // is non-zero.
         let mut buf = surface.buffer_mut()?;
-        let color: u32 = if self.cpu.ram[0x400] != 0 {
-            0x_00ff_ffff
-        } else {
-            0
-        };
+        let color: u32 = if cpu.ram[0x400] != 0 { 0x_00ff_ffff } else { 0 };
         buf.fill(color);
 
         self.window.as_ref().unwrap().pre_present_notify();
         buf.present()?;
 
         Ok(())
-    }
-
-    fn tick(&mut self) {
-        self.cpu.step();
-        self.window.as_ref().unwrap().request_redraw();
     }
 }
 
@@ -179,6 +202,6 @@ impl ApplicationHandler for App {
     }
 
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, (): ()) {
-        self.tick()
+        self.window.as_ref().unwrap().request_redraw();
     }
 }
