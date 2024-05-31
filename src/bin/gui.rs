@@ -32,8 +32,6 @@ const DESIRED_WINDOW_SIZE: PhysicalSize<u32> = {
 };
 
 fn main() -> Result<()> {
-    // todo: accept CLI args: --load-addr --start-addr
-
     let (filename,) = env::args()
         .skip(1)
         .collect_tuple()
@@ -43,10 +41,9 @@ fn main() -> Result<()> {
     let mut prog = vec![];
     file.read_to_end(&mut prog)?;
 
-    let mut ram = vec![0; MEM_LEN];
-    ram[0x2000..][..prog.len()].copy_from_slice(&prog);
-
-    let cpu = Arc::new(Mutex::new(Cpu::new(ram, 0x2000)));
+    // todo: accept CLI args: --load-addr, --start-addr
+    let ram = load_program(&prog, 0x2000); // load addr
+    let cpu = Arc::new(Mutex::new(Cpu::new(ram, 0x2000))); // start addr
     let mut debugger = Debugger::new(Arc::clone(&cpu));
 
     thread::spawn(move || loop {
@@ -75,6 +72,57 @@ fn main() -> Result<()> {
     event_loop.run_app(&mut App::new(cpu))?;
 
     Ok(())
+}
+
+fn load_program(prog: &[u8], load_addr: u16) -> Vec<u8> {
+    struct Slice<'a> {
+        offset: usize,
+        bytes: &'a [u8],
+    }
+
+    let mut slices = vec![];
+    slices.push(Slice {
+        bytes: prog,
+        offset: load_addr.into(),
+    });
+
+    let rom_f8 = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Unenh_IIe_F8ROM"));
+    debug_assert_eq!(rom_f8.len(), 0x800);
+    slices.push(Slice {
+        bytes: rom_f8,
+        offset: 0xf800,
+    });
+
+    let rom_applesoft = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Applesoft"));
+    debug_assert_eq!(rom_applesoft.len(), 0x2800);
+    slices.push(Slice {
+        bytes: rom_applesoft,
+        offset: 0xd000,
+    });
+
+    let rom_80col = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Unenh_IIe_80col"));
+    debug_assert_eq!(rom_80col.len(), 0x300 + 0x800 - 1);
+    slices.push(Slice {
+        bytes: &rom_80col[..0x300],
+        offset: 0xc100,
+    });
+    slices.push(Slice {
+        bytes: &rom_80col[0x300..],
+        offset: 0xc800,
+    });
+
+    // Check the slices don't overlap.
+    slices.sort_by_key(|s| s.offset);
+    for w in slices.windows(2) {
+        let [s1, s2] = w else { unreachable!() };
+        assert!(s1.offset + s1.bytes.len() <= s2.offset);
+    }
+
+    let mut ram = vec![0; MEM_LEN];
+    for s in slices {
+        ram[s.offset..][..s.bytes.len()].copy_from_slice(s.bytes);
+    }
+    ram
 }
 
 struct App {
@@ -158,9 +206,7 @@ impl App {
         // eprintln!("\n{:?}", cpu);
 
         // TODO:
-        // * debug test prog not blinking the screen any more
-        // * then commit what we have so far and start thinking about the wobbly
-        //      tunnel demo / GR display mode
+        // * start thinking about the wobbly tunnel demo / GR display mode
         // * maybe could impl a text-based dump of screen memory as a starting
         //      point, before going to actual graphics
 
