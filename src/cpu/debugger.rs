@@ -24,6 +24,7 @@ impl Debugger {
         Self {
             cpu,
             num_instructions_executed: 0,
+            // breakpoints: vec![0x2000], // add breakpoints here as needed
             breakpoints: vec![],
             single_step: false,
         }

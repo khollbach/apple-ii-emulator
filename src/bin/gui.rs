@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     let cpu = Arc::new(Mutex::new(Cpu::new(ram, 0x2000)));
     let mut debugger = Debugger::new(Arc::clone(&cpu));
 
-    thread::spawn(move || {
+    thread::spawn(move || loop {
         // hack: since 1 cycle != 1 instr, let's slow down a bit
         // Could look into cycle-accuracy at some point maybe (low-prio)
         // thread::sleep(Duration::from_millis(1));
