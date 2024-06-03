@@ -15,7 +15,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
     cpu::{debugger::Debugger, Cpu, MEM_LEN},
-    display::{self, Color},
+    display::{self, color::Color},
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
