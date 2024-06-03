@@ -1,4 +1,8 @@
+mod spritesheet;
+
 use core::fmt;
+
+use spritesheet::SPRITES;
 
 use super::{color::Color, hgr};
 use crate::display::gr::unscramble_bytes;
@@ -89,11 +93,15 @@ impl Glyph {
         }
     }
 
-    fn dots(self) -> [[bool; CELL_W]; CELL_H] {
-        // mocked out, for now
+    fn to_byte(self) -> u8 {
         match self {
-            Glyph::PrintableAscii(_) => [[false; CELL_W]; CELL_H],
-            Glyph::Cursor => [[true; CELL_W]; CELL_H],
+            Glyph::PrintableAscii(b) => b | 0x80, // todo: handle hibit details correctly
+            Glyph::Cursor => 0xff,
         }
+    }
+
+    fn dots(self) -> [[bool; CELL_W]; CELL_H] {
+        let idx = self.to_byte() as usize;
+        SPRITES[idx]
     }
 }
