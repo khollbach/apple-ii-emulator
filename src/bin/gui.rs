@@ -211,8 +211,8 @@ impl App {
         let screen = text::ram_to_text(&cpu.ram);
         eprintln!();
         for row in screen {
-            for c in row {
-                eprint!("{}", c);
+            for glyph in row {
+                eprint!("{}", glyph);
             }
             eprintln!();
         }

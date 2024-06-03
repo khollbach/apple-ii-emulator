@@ -1,3 +1,6 @@
+use core::fmt;
+
+use super::{color::Color, hgr};
 use crate::display::gr::unscramble_bytes;
 
 pub const W: usize = 40;
@@ -6,39 +9,82 @@ pub const H: usize = 24;
 pub const CELL_W: usize = 7;
 pub const CELL_H: usize = 8;
 
-pub fn ram_to_text(mem: &[u8]) -> Vec<Vec<char>> {
+pub fn ram_to_text(mem: &[u8]) -> Vec<Vec<Glyph>> {
     assert_eq!(mem.len(), 2_usize.pow(16)); // 64 KiB
 
     let page1 = &mem[0x400..0x800];
     let bytes = unscramble_bytes(page1);
 
-    let mut out = vec![vec![' '; W]; H];
+    let mut out = vec![vec![Glyph::Cursor; W]; H];
     for y in 0..H {
         for x in 0..W {
-            out[y][x] = byte_to_char(bytes[y][x]);
+            out[y][x] = Glyph::from_byte(bytes[y][x]);
         }
     }
     out
 }
 
-// this isn't quite right; but it's close enough for now.
-fn byte_to_char(b: u8) -> char {
-    text_byte_to_ascii(b) as char
+pub fn ram_to_dots(mem: &[u8]) -> Vec<Vec<Color>> {
+    let screen = ram_to_text(mem);
+
+    let mut out = vec![vec![Color::Black; hgr::W]; hgr::H];
+    for y in 0..H {
+        for x in 0..W {
+            draw(&mut out, x, y, screen[y][x]);
+        }
+    }
+    out
 }
 
-fn text_byte_to_ascii(mut b: u8) -> u8 {
-    // clear them hibits (not technically correct, but we can come back to this)
-    if b >= 0x80 {
-        b -= 0x80;
+fn draw(dots: &mut Vec<Vec<Color>>, x: usize, y: usize, glyph: Glyph) {
+    // TODO: left off here, impl'ing "blit" (?)
+    todo!()
+}
+
+// (can add inverse & blinking text at some point)
+#[derive(Debug, Clone, Copy)]
+pub enum Glyph {
+    /// 0x20..=0x7e
+    PrintableAscii(u8),
+
+    /// Checkerboard block, often used as a cursor when typing text.
+    Cursor,
+}
+
+impl fmt::Display for Glyph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let c = match *self {
+            Glyph::PrintableAscii(b) => b as char,
+            Glyph::Cursor => '�',
+        };
+        write!(f, "{}", c)
+    }
+}
+
+impl Glyph {
+    // this isn't quite right; but it's close enough for now.
+    fn from_byte(mut b: u8) -> Self {
+        // clear them hibits (not technically correct, but we can come back to this)
+        if b >= 0x80 {
+            b -= 0x80;
+        }
+
+        match b {
+            0x00..=0x1f => Self::Cursor, // todo: these should show up as capital letters
+
+            // "normal" range
+            0x20..=0x7e => Self::PrintableAscii(b),
+            0x7f => Self::Cursor,
+
+            0x80..=0xff => unreachable!(),
+        }
     }
 
-    match b {
-        0x00..=0x1f => b'~', // todo: these should actually be capital letters
-
-        // "normal" range
-        0x20..=0x7e => b,
-        0x7f => b'~', // todo: special "block" glyph
-
-        0x80..=0xff => unreachable!(),
+    fn dots(self) -> [[bool; CELL_W]; CELL_H] {
+        // mocked out, for now
+        match self {
+            Glyph::PrintableAscii(_) => [[false; CELL_W]; CELL_H],
+            Glyph::Cursor => [[true; CELL_W]; CELL_H],
+        }
     }
 }
