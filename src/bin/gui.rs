@@ -13,7 +13,10 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use apple_ii_emulator::{cpu::{debugger::Debugger, Cpu, MEM_LEN}, display};
+use apple_ii_emulator::{
+    cpu::{debugger::Debugger, Cpu, MEM_LEN},
+    display::{self, Color},
+};
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
 use winit::{
@@ -27,8 +30,8 @@ use winit::{
 type StdResult<T, E> = std::result::Result<T, E>;
 
 const DESIRED_WINDOW_SIZE: PhysicalSize<u32> = {
-    let scale = 2;
-    PhysicalSize::new(280 * scale, 192 * scale)
+    let scale = 1; // todo: support non-trivial scaling (low prio for now)
+    PhysicalSize::new(display::HGR_W as u32 * scale, display::HGR_H as u32 * scale)
 };
 
 fn main() -> Result<()> {
@@ -203,36 +206,23 @@ impl App {
         // We probably don't need to clone the whole 64KiB ram, but this seems
         // fine for now.
         let cpu = self.cpu.lock().unwrap().clone();
-        // eprintln!("\n{:?}", cpu);
-
-        // TODO:
-        // * start thinking about the wobbly tunnel demo / GR display mode
-        // * maybe could impl a text-based dump of screen memory as a starting
-        //      point, before going to actual graphics
-
-        // looks good to me
-        eprintln!();
-        let grid = display::gr(&cpu.ram);
-        for y in 0..display::GR_H {
-            for x in 0..display::GR_W {
-                eprint!("{}", if grid[y][x] { '#' } else { '.' });
-            }
-            eprintln!();
-        }
+        let dots = display::gr_to_280x192(&cpu.ram);
 
         let surface = self.surface.as_mut().unwrap();
-
-        let one = 1.try_into().unwrap();
         surface.resize(
-            self.window_size.width.try_into().unwrap_or(one),
-            self.window_size.height.try_into().unwrap_or(one),
+            DESIRED_WINDOW_SIZE.width.try_into().unwrap(),
+            DESIRED_WINDOW_SIZE.height.try_into().unwrap(),
         )?;
 
-        // For now, paint the entire screen, indicating whether the byte at $400
-        // is non-zero.
         let mut buf = surface.buffer_mut()?;
-        let color: u32 = if cpu.ram[0x400] != 0 { 0x_00ff_ffff } else { 0 };
-        buf.fill(color);
+        for y in 0..display::HGR_H {
+            for x in 0..display::HGR_W {
+                buf[y * display::HGR_W + x] = match dots[y][x] {
+                    Color::Black => 0,
+                    Color::White => 0x_00ff_ffff,
+                }
+            }
+        }
 
         self.window.as_ref().unwrap().pre_present_notify();
         buf.present()?;
