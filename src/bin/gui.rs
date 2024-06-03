@@ -15,7 +15,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
     cpu::{debugger::Debugger, Cpu, MEM_LEN},
-    display::{self, color::Color, hgr},
+    display::{self, color::Color, gr, hgr},
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
@@ -206,7 +206,7 @@ impl App {
         // We probably don't need to clone the whole 64KiB ram, but this seems
         // fine for now.
         let cpu = self.cpu.lock().unwrap().clone();
-        let dots = display::gr::ram_to_dots(&cpu.ram);
+        let dots = gr::ram_to_dots(&cpu.ram);
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(
