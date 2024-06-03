@@ -217,10 +217,8 @@ impl App {
         let mut buf = surface.buffer_mut()?;
         for y in 0..display::HGR_H {
             for x in 0..display::HGR_W {
-                buf[y * display::HGR_W + x] = match dots[y][x] {
-                    Color::Black => 0,
-                    Color::White => 0x_00ff_ffff,
-                }
+                let rgb = dots[y][x].rgb();
+                buf[y * display::HGR_W + x] = pack_rgb(rgb);
             }
         }
 
@@ -229,6 +227,13 @@ impl App {
 
         Ok(())
     }
+}
+
+fn pack_rgb([r, g, b]: [u8; 3]) -> u32 {
+    let r = r as u32;
+    let g = g as u32;
+    let b = b as u32;
+    r << 16 | g << 8 | b
 }
 
 impl ApplicationHandler for App {
