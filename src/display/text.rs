@@ -30,15 +30,24 @@ pub fn ram_to_dots(mem: &[u8]) -> Vec<Vec<Color>> {
     let mut out = vec![vec![Color::Black; hgr::W]; hgr::H];
     for y in 0..H {
         for x in 0..W {
-            draw(&mut out, x, y, screen[y][x]);
+            draw(&mut out, x * CELL_W, y * CELL_H, screen[y][x]);
         }
     }
     out
 }
 
 fn draw(dots: &mut Vec<Vec<Color>>, x: usize, y: usize, glyph: Glyph) {
-    // TODO: left off here, impl'ing "blit" (?)
-    todo!()
+    let sprite = glyph.dots();
+    for dy in 0..CELL_H {
+        for dx in 0..CELL_W {
+            let color = if sprite[dy][dx] {
+                Color::White
+            } else {
+                Color::Black
+            };
+            dots[y + dy][x + dx] = color;
+        }
+    }
 }
 
 // (can add inverse & blinking text at some point)

@@ -206,7 +206,8 @@ impl App {
         // We probably don't need to clone the whole 64KiB ram, but this seems
         // fine for now.
         let cpu = self.cpu.lock().unwrap().clone();
-        let dots = gr::ram_to_dots(&cpu.ram);
+        // let dots = gr::ram_to_dots(&cpu.ram);
+        let dots = text::ram_to_dots(&cpu.ram);
 
         let screen = text::ram_to_text(&cpu.ram);
         eprintln!();
