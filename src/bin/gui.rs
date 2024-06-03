@@ -207,16 +207,8 @@ impl App {
         // fine for now.
         let cpu = self.cpu.lock().unwrap().clone();
         // let dots = gr::ram_to_dots(&cpu.ram);
-        let dots = text::ram_to_dots(&cpu.ram);
-
-        let screen = text::ram_to_text(&cpu.ram);
-        eprintln!();
-        for row in screen {
-            for glyph in row {
-                eprint!("{}", glyph);
-            }
-            eprintln!();
-        }
+        // let dots = text::ram_to_dots(&cpu.ram);
+        let dots = hgr::ram_to_dots(&cpu.ram);
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(
