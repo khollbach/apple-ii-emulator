@@ -15,7 +15,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
     cpu::{debugger::Debugger, Cpu, MEM_LEN},
-    display::{self, color::Color},
+    display::{self, color::Color, hgr},
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
@@ -31,7 +31,7 @@ type StdResult<T, E> = std::result::Result<T, E>;
 
 const DESIRED_WINDOW_SIZE: PhysicalSize<u32> = {
     let scale = 1; // todo: support non-trivial scaling (low prio for now)
-    PhysicalSize::new(display::HGR_W as u32 * scale, display::HGR_H as u32 * scale)
+    PhysicalSize::new(hgr::W as u32 * scale, hgr::H as u32 * scale)
 };
 
 fn main() -> Result<()> {
@@ -206,7 +206,7 @@ impl App {
         // We probably don't need to clone the whole 64KiB ram, but this seems
         // fine for now.
         let cpu = self.cpu.lock().unwrap().clone();
-        let dots = display::gr_to_280x192(&cpu.ram);
+        let dots = display::gr::ram_to_dots(&cpu.ram);
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(
@@ -215,10 +215,10 @@ impl App {
         )?;
 
         let mut buf = surface.buffer_mut()?;
-        for y in 0..display::HGR_H {
-            for x in 0..display::HGR_W {
+        for y in 0..hgr::H {
+            for x in 0..hgr::W {
                 let rgb = dots[y][x].rgb();
-                buf[y * display::HGR_W + x] = pack_rgb(rgb);
+                buf[y * hgr::W + x] = pack_rgb(rgb);
             }
         }
 
