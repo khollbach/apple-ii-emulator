@@ -15,7 +15,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
     cpu::{debugger::Debugger, Cpu, MEM_LEN},
-    display::{self, color::Color, gr, hgr},
+    display::{self, color::Color, gr, hgr, text},
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
@@ -207,6 +207,15 @@ impl App {
         // fine for now.
         let cpu = self.cpu.lock().unwrap().clone();
         let dots = gr::ram_to_dots(&cpu.ram);
+
+        let screen = text::ram_to_text(&cpu.ram);
+        eprintln!();
+        for row in screen {
+            for c in row {
+                eprint!("{}", c);
+            }
+            eprintln!();
+        }
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(

@@ -38,7 +38,7 @@ fn color_grid(page: &[u8]) -> Vec<Vec<Color>> {
     out
 }
 
-fn unscramble_bytes(page: &[u8]) -> Vec<Vec<u8>> {
+pub(super) fn unscramble_bytes(page: &[u8]) -> Vec<Vec<u8>> {
     assert_eq!(page.len(), 0x400); // 1 KiB
 
     let mut out = vec![vec![0u8; W]; H / 2];
