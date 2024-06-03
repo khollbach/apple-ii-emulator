@@ -13,7 +13,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use apple_ii_emulator::cpu::{debugger::Debugger, Cpu, MEM_LEN};
+use apple_ii_emulator::{cpu::{debugger::Debugger, Cpu, MEM_LEN}, display};
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
 use winit::{
@@ -209,6 +209,16 @@ impl App {
         // * start thinking about the wobbly tunnel demo / GR display mode
         // * maybe could impl a text-based dump of screen memory as a starting
         //      point, before going to actual graphics
+
+        // looks good to me
+        eprintln!();
+        let grid = display::gr(&cpu.ram);
+        for y in 0..display::GR_H {
+            for x in 0..display::GR_W {
+                eprint!("{}", if grid[y][x] { '#' } else { '.' });
+            }
+            eprintln!();
+        }
 
         let surface = self.surface.as_mut().unwrap();
 
