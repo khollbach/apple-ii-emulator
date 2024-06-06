@@ -218,7 +218,7 @@ impl App {
         let cpu = self.cpu.lock().unwrap().clone();
         // let dots = gr::ram_to_dots(&cpu.ram);
         // let dots = text::ram_to_dots(&cpu.ram);
-        let dots = hgr::ram_to_dots(&cpu.ram);
+        let dots = hgr::ram_to_dots_color(&cpu.ram);
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(
