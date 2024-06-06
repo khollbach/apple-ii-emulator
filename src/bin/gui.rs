@@ -45,8 +45,18 @@ fn main() -> Result<()> {
     file.read_to_end(&mut prog)?;
 
     // todo: accept CLI args: --load-addr, --start-addr
-    let ram = load_program(&prog, 0x2000); // load addr
-    let cpu = Arc::new(Mutex::new(Cpu::new(ram, 0x2000))); // start addr
+    let mut ram = load_program(&prog, 0x2000); // load addr
+
+    // temporary hack: run RESET routine, but skip disk loading code.
+    // This sets up required state for keyboard input routines, etc.
+    // Once we figure out how interrupts work, we can re-visit this.
+    assert_eq!(ram[0x03f2..][..3], [0, 0, 0]);
+    ram[0x03f2] = 0x00; // start_addr lo
+    ram[0x03f3] = 0x20; // start_addr hi
+    ram[0x03f4] = 0xa5 ^ ram[0x03f3]; // magic number to indicate "warm start"
+    let pc = 0xfa62; // RESET
+
+    let cpu = Arc::new(Mutex::new(Cpu::new(ram, pc)));
     let mut debugger = Debugger::new(Arc::clone(&cpu));
 
     thread::spawn(move || loop {
