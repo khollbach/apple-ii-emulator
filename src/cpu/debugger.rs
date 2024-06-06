@@ -3,12 +3,11 @@
 
 use std::{
     io,
-    ops::ControlFlow,
     sync::{Arc, Mutex},
 };
 
 use crate::{
-    cpu::{instr::Mode, opcode, Cpu},
+    cpu::{opcode, Cpu},
     hex,
 };
 

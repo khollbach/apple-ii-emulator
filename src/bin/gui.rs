@@ -5,7 +5,6 @@ use std::{
     error::Error,
     fs::File,
     io::prelude::*,
-    ops::ControlFlow,
     rc::Rc,
     sync::{Arc, Mutex},
     thread,
@@ -15,7 +14,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
     cpu::{debugger::Debugger, Cpu, MEM_LEN},
-    display::{self, color::Color, gr, hgr, text},
+    display::{gr, hgr, text},
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
