@@ -107,14 +107,22 @@ impl Cpu {
 
             Instr::Asl => {
                 self.flags.clear(Flag::Carry);
-                self.rol(mem, loc);
+                let v = self.rol(loc.get(self, mem));
+                loc.set(self, mem, v);
             }
             Instr::Lsr => {
                 self.flags.clear(Flag::Carry);
-                self.ror(mem, loc);
+                let v = self.ror(loc.get(self, mem));
+                loc.set(self, mem, v);
             }
-            Instr::Rol => self.rol(mem, loc),
-            Instr::Ror => self.ror(mem, loc),
+            Instr::Rol => {
+                let v = self.rol(loc.get(self, mem));
+                loc.set(self, mem, v);
+            }
+            Instr::Ror => {
+                let v = self.ror(loc.get(self, mem));
+                loc.set(self, mem, v);
+            }
 
             Instr::Bit => {
                 let v = loc.get(self, mem);
@@ -177,24 +185,24 @@ impl Cpu {
         self.flags.assign(Flag::Carry, ret.carry);
     }
 
-    fn rol(&mut self, mem: &mut impl Memory, loc: Operand) {
-        let (mut v, c) = arith::overflowing_shl(loc.get(self, mem), 1);
+    fn rol(&mut self, arg: u8) -> u8 {
+        let (mut out, c) = arith::overflowing_shl(arg, 1);
         if self.flags.is_set(Flag::Carry) {
-            v |= 1;
+            out |= 1;
         }
-        loc.set(self, mem, v);
-        self.flags.nz(v);
+        self.flags.nz(out);
         self.flags.assign(Flag::Carry, c);
+        out
     }
 
-    fn ror(&mut self, mem: &mut impl Memory, loc: Operand) {
-        let (mut v, c) = arith::overflowing_shr(loc.get(self, mem), 1);
+    fn ror(&mut self, arg: u8) -> u8 {
+        let (mut out, c) = arith::overflowing_shr(arg, 1);
         if self.flags.is_set(Flag::Carry) {
-            v |= 0x80;
+            out |= 0x80;
         }
-        loc.set(self, mem, v);
-        self.flags.nz(v);
+        self.flags.nz(out);
         self.flags.assign(Flag::Carry, c);
+        out
     }
 
     fn would_branch(&self, branch: Instr) -> bool {
