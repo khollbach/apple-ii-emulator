@@ -1,3 +1,4 @@
+/*
 use std::{env, fs::File, io::prelude::*};
 
 use anyhow::{Context, Result};
@@ -23,4 +24,12 @@ fn main() -> Result<()> {
     Cpu::new(mem, start_addr).run();
 
     Ok(())
+}
+*/
+
+// TODO: set this up as an automated test somehow.
+// * then move src/bin/gui.rs to src/main.rs
+
+fn main() {
+    todo!();
 }

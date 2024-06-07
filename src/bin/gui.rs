@@ -13,9 +13,9 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
-    cpu::{debugger::Debugger, Cpu},
+    cpu::{Cpu, Debugger},
     display::{gr, hgr, text},
-    memory::Memory,
+    memory::{Mem, Memory},
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
@@ -45,20 +45,23 @@ fn main() -> Result<()> {
     file.read_to_end(&mut prog)?;
 
     // todo: accept CLI args: --load-addr, --start-addr
-    let mut mem = Memory::load_program(&prog, 0x2000); // load addr
+    let mut mem = Mem::new(&prog, 0x2000); // load addr
     let pc = mem.set_softev(0x2000); // start addr
 
-    let cpu = Arc::new(Mutex::new(Cpu::new(mem, pc)));
-    let mut debugger = Debugger::new(Arc::clone(&cpu));
+    let shared_mem = Arc::new(Mutex::new(mem));
 
-    thread::spawn(move || loop {
-        // hack: since 1 cycle != 1 instr, let's slow down a bit
-        // Could look into cycle-accuracy at some point maybe (low-prio)
-        // thread::sleep(Duration::from_millis(1));
-        thread::sleep(Duration::from_millis(3));
+    let mem = Arc::clone(&shared_mem);
+    thread::spawn(move || {
+        let mut cpu = Debugger::new(pc);
+        loop {
+            // hack: since 1 cycle != 1 instr, let's slow down a bit
+            // Could look into cycle-accuracy at some point maybe (low-prio)
+            // thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(3));
 
-        for _ in 0..1_000 {
-            debugger.step();
+            for _ in 0..1_000 {
+                cpu.step(&mem);
+            }
         }
     });
 
@@ -74,7 +77,7 @@ fn main() -> Result<()> {
         }
     });
 
-    event_loop.run_app(&mut App::new(cpu))?;
+    event_loop.run_app(&mut App::new(shared_mem))?;
 
     Ok(())
 }
@@ -84,17 +87,17 @@ struct App {
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     occluded: bool,
     window_size: PhysicalSize<u32>,
-    cpu: Arc<Mutex<Cpu>>,
+    mem: Arc<Mutex<Mem>>,
 }
 
 impl App {
-    fn new(cpu: Arc<Mutex<Cpu>>) -> Self {
+    fn new(mem: Arc<Mutex<Mem>>) -> Self {
         Self {
             window: None,
             surface: None,
             occluded: false,
             window_size: DESIRED_WINDOW_SIZE,
-            cpu,
+            mem,
         }
     }
 
@@ -156,10 +159,10 @@ impl App {
     fn redraw(&mut self) -> StdResult<(), SoftBufferError> {
         // We probably don't need to clone the whole 64KiB ram, but this seems
         // fine for now.
-        let cpu = self.cpu.lock().unwrap().clone();
-        // let dots = gr::ram_to_dots(&cpu.ram);
-        // let dots = text::ram_to_dots(&cpu.ram);
-        let dots = hgr::ram_to_dots_color(&cpu.mem.ram);
+        let mem = self.mem.lock().unwrap().clone();
+        // let dots = gr::dots(mem.gr_page1());
+        // let dots = text::dots(mem.gr_page1());
+        let dots = hgr::dots_color(mem.hgr_page1());
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(

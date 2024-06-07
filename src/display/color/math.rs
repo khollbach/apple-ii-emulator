@@ -1,5 +1,5 @@
 //! The implementation details are taken from this wikipedia article:
-//! https://en.wikipedia.org/wiki/Y%E2%80%B2UV
+//! <https://en.wikipedia.org/wiki/Y%E2%80%B2UV>
 //!
 //! I didn't actually read & understand the article. In particular, it sounds
 //! like there are different possible meanings of "YUV". Hopefully what we've

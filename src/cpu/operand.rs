@@ -1,4 +1,7 @@
-use crate::cpu::{instr::Mode, Cpu};
+use crate::{
+    cpu::{instr::Mode, Cpu},
+    memory::Memory,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Operand {
@@ -9,11 +12,11 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn from_mode(cpu: &Cpu, mode: Mode) -> Self {
+    pub fn new(cpu: &Cpu, mem: &mut impl Memory, mode: Mode) -> Self {
         let arg: u16 = match mode.arg_len() {
             0 => 0,
-            1 => cpu.mem.get(cpu.pc.checked_add(1).unwrap()).into(),
-            2 => cpu.get_word(cpu.pc.checked_add(1).unwrap()),
+            1 => mem.get(cpu.pc.checked_add(1).unwrap()).into(),
+            2 => mem.get_word(cpu.pc.checked_add(1).unwrap()),
             _ => unreachable!(),
         };
 
@@ -49,29 +52,29 @@ impl Operand {
             },
 
             Mode::Indirect => Self::Memory {
-                addr: cpu.get_word(arg),
+                addr: mem.get_word(arg),
             },
             Mode::XIndirect => Self::Memory {
-                addr: cpu.get_word((arg as u8).wrapping_add(cpu.x) as u16),
+                addr: mem.get_word((arg as u8).wrapping_add(cpu.x) as u16),
             },
             Mode::IndirectY => Self::Memory {
-                addr: cpu.get_word(arg).checked_add(cpu.y as u16).unwrap(),
+                addr: mem.get_word(arg).checked_add(cpu.y as u16).unwrap(),
             },
         }
     }
 
-    pub fn get(self, cpu: &Cpu) -> u8 {
+    pub fn get(self, cpu: &Cpu, mem: &mut impl Memory) -> u8 {
         match self {
-            Self::Memory { addr } => cpu.mem.get(addr),
+            Self::Memory { addr } => mem.get(addr),
             Self::Literal { value } => value,
             Self::Accumulator => cpu.a,
             Self::None => panic!("operand is none; cannot get its value"),
         }
     }
 
-    pub fn set(self, cpu: &mut Cpu, value: u8) {
+    pub fn set(self, cpu: &mut Cpu, mem: &mut impl Memory, value: u8) {
         match self {
-            Self::Memory { addr } => cpu.mem.set(addr, value),
+            Self::Memory { addr } => mem.set(addr, value),
             Self::Literal { .. } => panic!("cannot mutate literal value {self:?}"),
             Self::Accumulator => cpu.a = value,
             Self::None => panic!("operand is none; cannot set its value"),

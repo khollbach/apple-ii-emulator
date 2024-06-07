@@ -10,18 +10,15 @@ pub struct Byte {
     pub bits: [bool; 7],
 }
 
-pub fn unscramble(mem: &[u8]) -> Vec<Vec<Byte>> {
-    assert_eq!(mem.len(), 2_usize.pow(16)); // 64 KiB
-    let page1 = &mem[0x2000..0x4000];
-
-    let sheets = split_sheets(page1);
+pub fn unscramble(page: &[u8]) -> Vec<Vec<Byte>> {
+    assert_eq!(page.len(), 0x2000);
+    let sheets = split_sheets(page);
     let sheets = sheets.map(gr::unscramble_bytes);
     let sheets = sheets.map(sheet_u8_to_byte);
     weave_sheets(sheets)
 }
 
 fn split_sheets(page: &[u8]) -> [&[u8]; 8] {
-    assert_eq!(page.len(), 0x2000);
     let mut out = [[].as_slice(); 8];
     for i in 0..8 {
         out[i] = &page[i * 0x400..][..0x400];

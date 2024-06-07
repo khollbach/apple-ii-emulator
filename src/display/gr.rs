@@ -7,11 +7,8 @@ pub const H: usize = 48;
 pub const BLOCK_W: usize = 7;
 pub const BLOCK_H: usize = 4;
 
-pub fn ram_to_dots(mem: &[u8]) -> Vec<Vec<Color>> {
-    assert_eq!(mem.len(), 2_usize.pow(16)); // 64 KiB
-
-    let page1 = &mem[0x400..0x800];
-    let blocks = color_grid(page1);
+pub fn dots(page: &[u8]) -> Vec<Vec<Color>> {
+    let blocks = color_grid(page);
 
     let mut out = vec![vec![Color::Black; hgr::W]; hgr::H];
     for y in 0..hgr::H {

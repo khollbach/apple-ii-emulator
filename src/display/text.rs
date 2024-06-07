@@ -13,28 +13,25 @@ pub const H: usize = 24;
 pub const CELL_W: usize = 7;
 pub const CELL_H: usize = 8;
 
-pub fn ram_to_text(mem: &[u8]) -> Vec<Vec<Glyph>> {
-    assert_eq!(mem.len(), 2_usize.pow(16)); // 64 KiB
+pub fn dots(page: &[u8]) -> Vec<Vec<Color>> {
+    let cells = glyphs(page);
 
-    let page1 = &mem[0x400..0x800];
-    let bytes = unscramble_bytes(page1);
-
-    let mut out = vec![vec![Glyph::Cursor; W]; H];
+    let mut out = vec![vec![Color::Black; hgr::W]; hgr::H];
     for y in 0..H {
         for x in 0..W {
-            out[y][x] = Glyph::from_byte(bytes[y][x]);
+            draw(&mut out, x * CELL_W, y * CELL_H, cells[y][x]);
         }
     }
     out
 }
 
-pub fn ram_to_dots(mem: &[u8]) -> Vec<Vec<Color>> {
-    let screen = ram_to_text(mem);
+fn glyphs(page: &[u8]) -> Vec<Vec<Glyph>> {
+    let bytes = unscramble_bytes(page);
 
-    let mut out = vec![vec![Color::Black; hgr::W]; hgr::H];
+    let mut out = vec![vec![Glyph::Cursor; W]; H];
     for y in 0..H {
         for x in 0..W {
-            draw(&mut out, x * CELL_W, y * CELL_H, screen[y][x]);
+            out[y][x] = Glyph::from_byte(bytes[y][x]);
         }
     }
     out
