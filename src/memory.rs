@@ -56,10 +56,34 @@ impl Memory {
     }
 
     pub fn get(&self, addr: u16) -> u8 {
+        // self.trigger_soft_switches(addr); // todo: ...
         self.ram[addr as usize]
     }
 
     pub fn set(&mut self, addr: u16, value: u8) {
+        self.trigger_soft_switches(addr);
         self.ram[addr as usize] = value;
+    }
+
+    fn trigger_soft_switches(&mut self, addr: u16) {
+        if addr == 0xc010 {
+            // Clear keyboard strobe.
+            self.ram[0xc000] &= 0x7f;
+        }
+    }
+
+    /// temporary hack: run RESET routine, but skip disk loading code.
+    /// This sets up required state for keyboard input routines, etc.
+    /// Once we figure out how interrupts work, we can re-visit this.
+    pub fn set_softev(&mut self, start_addr: u16) -> u16 {
+        assert_eq!(self.ram[0x03f2..][..3], [0, 0, 0]);
+
+        let [lo, hi] = start_addr.to_le_bytes();
+        self.ram[0x03f2] = lo;
+        self.ram[0x03f3] = hi;
+        self.ram[0x03f4] = 0xa5 ^ self.ram[0x03f3]; // magic number to indicate "warm start"
+
+        let pc = 0xfa62; // RESET
+        pc
     }
 }

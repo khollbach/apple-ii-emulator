@@ -46,15 +46,7 @@ fn main() -> Result<()> {
 
     // todo: accept CLI args: --load-addr, --start-addr
     let mut mem = Memory::load_program(&prog, 0x2000); // load addr
-
-    // temporary hack: run RESET routine, but skip disk loading code.
-    // This sets up required state for keyboard input routines, etc.
-    // Once we figure out how interrupts work, we can re-visit this.
-    assert_eq!(mem.ram[0x03f2..][..3], [0, 0, 0]);
-    mem.ram[0x03f2] = 0x00; // start_addr lo
-    mem.ram[0x03f3] = 0x20; // start_addr hi
-    mem.ram[0x03f4] = 0xa5 ^ mem.ram[0x03f3]; // magic number to indicate "warm start"
-    let pc = 0xfa62; // RESET
+    let pc = mem.set_softev(0x2000); // start addr
 
     let cpu = Arc::new(Mutex::new(Cpu::new(mem, pc)));
     let mut debugger = Debugger::new(Arc::clone(&cpu));
