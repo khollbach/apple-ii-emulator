@@ -1,11 +1,7 @@
 use std::{env, fs::File, io::prelude::*};
 
 use anyhow::{Context, Result};
-use apple_ii_emulator::{
-    cpu::Cpu,
-    hex,
-    memory::{Memory, MEM_LEN},
-};
+use apple_ii_emulator::{cpu::Cpu, hex, memory::Memory};
 use itertools::Itertools;
 
 fn main() -> Result<()> {
@@ -23,10 +19,7 @@ fn main() -> Result<()> {
     let mut prog = vec![];
     file.read_to_end(&mut prog)?;
 
-    let mut ram = vec![0; MEM_LEN];
-    ram[load_addr as usize..][..prog.len()].copy_from_slice(&prog);
-    let mem = Memory { ram };
-
+    let mem = Memory::load_program(&prog, load_addr);
     Cpu::new(mem, start_addr).run();
 
     Ok(())

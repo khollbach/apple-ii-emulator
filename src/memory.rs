@@ -1,5 +1,3 @@
-pub const MEM_LEN: usize = 2_usize.pow(16);
-
 #[derive(Clone)]
 pub struct Memory {
     pub ram: Vec<u8>,
@@ -50,7 +48,7 @@ impl Memory {
             assert!(s1.offset + s1.bytes.len() <= s2.offset);
         }
 
-        let mut ram = vec![0; MEM_LEN];
+        let mut ram = vec![0; 2_usize.pow(16)];
         for s in slices {
             ram[s.offset..][..s.bytes.len()].copy_from_slice(s.bytes);
         }
