@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     let layout = [
         br###"!"#$%&'()*+,-./0123456789:;<=>?@"###,
         br###"ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`"###,
-        br###"abcdefghijklmonpqrstuvwxyz{|}~  "###,
+        br###"abcdefghijklmnopqrstuvwxyz{|}~  "###,
         //                                  ^the block is 2nd from last
     ];
     assert_eq!(layout.len(), n_rows as usize);
