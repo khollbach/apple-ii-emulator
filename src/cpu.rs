@@ -10,7 +10,7 @@ use flags::{Flag, Flags};
 use instr::{Instr, Mode};
 use operand::Operand;
 
-pub const MEM_LEN: usize = 2_usize.pow(16);
+use crate::memory::Memory;
 
 #[derive(Clone)]
 pub struct Cpu {
@@ -22,12 +22,11 @@ pub struct Cpu {
     pub x: u8,
     pub y: u8,
 
-    pub ram: Vec<u8>,
+    pub mem: Memory,
 }
 
 impl Cpu {
-    pub fn new(ram: Vec<u8>, start_addr: u16) -> Self {
-        assert_eq!(ram.len(), MEM_LEN);
+    pub fn new(mem: Memory, start_addr: u16) -> Self {
         Self {
             pc: start_addr,
             sp: u8::MAX,
@@ -35,7 +34,7 @@ impl Cpu {
             a: 0,
             x: 0,
             y: 0,
-            ram,
+            mem,
         }
     }
 
@@ -50,7 +49,7 @@ impl Cpu {
     }
 
     pub fn step(&mut self) {
-        let (instr, mode) = opcode::decode(self.get_byte(self.pc));
+        let (instr, mode) = opcode::decode(self.mem.get(self.pc));
 
         let loc = Operand::from_mode(self, mode);
 
@@ -165,17 +164,9 @@ impl Cpu {
         }
     }
 
-    fn get_byte(&self, addr: u16) -> u8 {
-        self.ram[addr as usize]
-    }
-
-    fn set_byte(&mut self, addr: u16, value: u8) {
-        self.ram[addr as usize] = value;
-    }
-
     fn get_word(&self, addr: u16) -> u16 {
-        let lo = self.get_byte(addr);
-        let hi = self.get_byte(addr.checked_add(1).unwrap());
+        let lo = self.mem.get(addr);
+        let hi = self.mem.get(addr.checked_add(1).unwrap());
         let word = u16::from_le_bytes([lo, hi]);
         word
     }
@@ -183,7 +174,7 @@ impl Cpu {
     /// Push to the stack.
     fn push(&mut self, value: u8) {
         let addr = 0x0100 + self.sp as u16;
-        self.set_byte(addr, value);
+        self.mem.set(addr, value);
         self.sp = self.sp.wrapping_sub(1);
     }
 
@@ -191,7 +182,7 @@ impl Cpu {
     fn pop(&mut self) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         let addr = 0x0100 + self.sp as u16;
-        self.get_byte(addr)
+        self.mem.get(addr)
     }
 
     /// Push a word to the stack.
@@ -277,13 +268,13 @@ impl Cpu {
         let [lo, hi] = self.pc.to_le_bytes();
         let jmp_absolute = 0x4c;
         let halt = [jmp_absolute, lo, hi];
-        &self.ram[self.pc as usize..][..3] == &halt
+        &self.mem.ram[self.pc as usize..][..3] == &halt
     }
 
     fn would_halt_branch(&self) -> bool {
-        let (instr, mode) = opcode::decode(self.ram[self.pc as usize]);
+        let (instr, mode) = opcode::decode(self.mem.get(self.pc));
         let is_branch = mode == Mode::Relative;
-        let in_place = self.get_byte(self.pc.checked_add(1).unwrap()) as i8 == -2;
+        let in_place = self.mem.get(self.pc.checked_add(1).unwrap()) as i8 == -2;
         is_branch && in_place && self.would_branch(instr)
     }
 }

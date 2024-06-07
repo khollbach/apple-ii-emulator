@@ -13,8 +13,9 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
-    cpu::{debugger::Debugger, Cpu, MEM_LEN},
+    cpu::{debugger::Debugger, Cpu},
     display::{gr, hgr, text},
+    memory::Memory,
 };
 use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
@@ -44,18 +45,18 @@ fn main() -> Result<()> {
     file.read_to_end(&mut prog)?;
 
     // todo: accept CLI args: --load-addr, --start-addr
-    let mut ram = load_program(&prog, 0x2000); // load addr
+    let mut mem = Memory::load_program(&prog, 0x2000); // load addr
 
     // temporary hack: run RESET routine, but skip disk loading code.
     // This sets up required state for keyboard input routines, etc.
     // Once we figure out how interrupts work, we can re-visit this.
-    assert_eq!(ram[0x03f2..][..3], [0, 0, 0]);
-    ram[0x03f2] = 0x00; // start_addr lo
-    ram[0x03f3] = 0x20; // start_addr hi
-    ram[0x03f4] = 0xa5 ^ ram[0x03f3]; // magic number to indicate "warm start"
+    assert_eq!(mem.ram[0x03f2..][..3], [0, 0, 0]);
+    mem.ram[0x03f2] = 0x00; // start_addr lo
+    mem.ram[0x03f3] = 0x20; // start_addr hi
+    mem.ram[0x03f4] = 0xa5 ^ mem.ram[0x03f3]; // magic number to indicate "warm start"
     let pc = 0xfa62; // RESET
 
-    let cpu = Arc::new(Mutex::new(Cpu::new(ram, pc)));
+    let cpu = Arc::new(Mutex::new(Cpu::new(mem, pc)));
     let mut debugger = Debugger::new(Arc::clone(&cpu));
 
     thread::spawn(move || loop {
@@ -84,57 +85,6 @@ fn main() -> Result<()> {
     event_loop.run_app(&mut App::new(cpu))?;
 
     Ok(())
-}
-
-fn load_program(prog: &[u8], load_addr: u16) -> Vec<u8> {
-    struct Slice<'a> {
-        offset: usize,
-        bytes: &'a [u8],
-    }
-
-    let mut slices = vec![];
-    slices.push(Slice {
-        bytes: prog,
-        offset: load_addr.into(),
-    });
-
-    let rom_f8 = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Unenh_IIe_F8ROM"));
-    debug_assert_eq!(rom_f8.len(), 0x800);
-    slices.push(Slice {
-        bytes: rom_f8,
-        offset: 0xf800,
-    });
-
-    let rom_applesoft = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Applesoft"));
-    debug_assert_eq!(rom_applesoft.len(), 0x2800);
-    slices.push(Slice {
-        bytes: rom_applesoft,
-        offset: 0xd000,
-    });
-
-    let rom_80col = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Unenh_IIe_80col"));
-    debug_assert_eq!(rom_80col.len(), 0x300 + 0x800 - 1);
-    slices.push(Slice {
-        bytes: &rom_80col[..0x300],
-        offset: 0xc100,
-    });
-    slices.push(Slice {
-        bytes: &rom_80col[0x300..],
-        offset: 0xc800,
-    });
-
-    // Check the slices don't overlap.
-    slices.sort_by_key(|s| s.offset);
-    for w in slices.windows(2) {
-        let [s1, s2] = w else { unreachable!() };
-        assert!(s1.offset + s1.bytes.len() <= s2.offset);
-    }
-
-    let mut ram = vec![0; MEM_LEN];
-    for s in slices {
-        ram[s.offset..][..s.bytes.len()].copy_from_slice(s.bytes);
-    }
-    ram
 }
 
 struct App {
@@ -217,7 +167,7 @@ impl App {
         let cpu = self.cpu.lock().unwrap().clone();
         // let dots = gr::ram_to_dots(&cpu.ram);
         // let dots = text::ram_to_dots(&cpu.ram);
-        let dots = hgr::ram_to_dots_color(&cpu.ram);
+        let dots = hgr::ram_to_dots_color(&cpu.mem.ram);
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(

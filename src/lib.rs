@@ -3,3 +3,4 @@
 pub mod cpu;
 pub mod display;
 pub mod hex;
+pub mod memory;

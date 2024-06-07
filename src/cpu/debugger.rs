@@ -57,8 +57,8 @@ impl Debugger {
 
         if self.single_step {
             eprintln!("{:?}", cpu);
-            let (instr, mode) = opcode::decode(cpu.ram[cpu.pc as usize]);
-            let instr_bytes = &cpu.ram[cpu.pc as usize..][..mode.instr_len() as usize];
+            let (instr, mode) = opcode::decode(cpu.mem.get(cpu.pc));
+            let instr_bytes = &cpu.mem.ram[cpu.pc as usize..][..mode.instr_len() as usize];
             eprintln!("next instr: {:02x?} {:?} {:?}", instr_bytes, instr, mode);
 
             loop {
@@ -83,7 +83,7 @@ impl Debugger {
                 }
 
                 let addr = hex::decode_u16(cmd).unwrap();
-                eprintln!("ram[${:04x}]: ${:02x}", addr, cpu.get_byte(addr));
+                eprintln!("ram[${:04x}]: ${:02x}", addr, cpu.mem.get(addr));
             }
         }
 

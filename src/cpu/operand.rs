@@ -12,7 +12,7 @@ impl Operand {
     pub fn from_mode(cpu: &Cpu, mode: Mode) -> Self {
         let arg: u16 = match mode.arg_len() {
             0 => 0,
-            1 => cpu.get_byte(cpu.pc.checked_add(1).unwrap()).into(),
+            1 => cpu.mem.get(cpu.pc.checked_add(1).unwrap()).into(),
             2 => cpu.get_word(cpu.pc.checked_add(1).unwrap()),
             _ => unreachable!(),
         };
@@ -62,7 +62,7 @@ impl Operand {
 
     pub fn get(self, cpu: &Cpu) -> u8 {
         match self {
-            Self::Memory { addr } => cpu.get_byte(addr),
+            Self::Memory { addr } => cpu.mem.get(addr),
             Self::Literal { value } => value,
             Self::Accumulator => cpu.a,
             Self::None => panic!("operand is none; cannot get its value"),
@@ -71,7 +71,7 @@ impl Operand {
 
     pub fn set(self, cpu: &mut Cpu, value: u8) {
         match self {
-            Self::Memory { addr } => cpu.set_byte(addr, value),
+            Self::Memory { addr } => cpu.mem.set(addr, value),
             Self::Literal { .. } => panic!("cannot mutate literal value {self:?}"),
             Self::Accumulator => cpu.a = value,
             Self::None => panic!("operand is none; cannot set its value"),

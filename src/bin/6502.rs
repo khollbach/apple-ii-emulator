@@ -2,8 +2,9 @@ use std::{env, fs::File, io::prelude::*};
 
 use anyhow::{Context, Result};
 use apple_ii_emulator::{
-    cpu::{Cpu, MEM_LEN},
+    cpu::Cpu,
     hex,
+    memory::{Memory, MEM_LEN},
 };
 use itertools::Itertools;
 
@@ -24,8 +25,9 @@ fn main() -> Result<()> {
 
     let mut ram = vec![0; MEM_LEN];
     ram[load_addr as usize..][..prog.len()].copy_from_slice(&prog);
+    let mem = Memory { ram };
 
-    Cpu::new(ram, start_addr).run();
+    Cpu::new(mem, start_addr).run();
 
     Ok(())
 }
