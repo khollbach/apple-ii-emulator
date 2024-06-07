@@ -22,8 +22,9 @@ use softbuffer::{Context, SoftBufferError, Surface};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
-    event::WindowEvent,
+    event::{ElementState, KeyEvent, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop, EventLoopClosed, OwnedDisplayHandle},
+    keyboard::{Key, NamedKey},
     window::{Window, WindowId},
 };
 
@@ -118,7 +119,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_window_event(
+    fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
         event: WindowEvent,
@@ -150,19 +151,54 @@ impl App {
                 }
             }
 
+            WindowEvent::KeyboardInput { event, .. } => self.key_event(event),
+
             _ => (),
         }
 
         Ok(())
     }
 
+    fn key_event(&self, e: KeyEvent) {
+        if !e.state.is_pressed() {
+            return;
+        }
+
+        // This mapping probably isn't 100% accurate, and we aren't handling
+        // modifiers very carefully. See the table on page 13 of the //e
+        // Technical Reference Manual for more ideas.
+        let ascii_code = match e.logical_key {
+            Key::Named(key) => {
+                match key {
+                    NamedKey::Backspace => 0x7f,
+                    NamedKey::ArrowLeft => 0x08,
+                    NamedKey::Tab => 0x09,
+                    NamedKey::ArrowDown => 0x0a,
+                    NamedKey::ArrowUp => 0x0b,
+                    NamedKey::Enter => 0x0d,
+                    NamedKey::ArrowRight => 0x15,
+                    NamedKey::Escape => 0x1b,
+                    NamedKey::Space => 0x20,
+                    NamedKey::Insert => todo!(), // (low-prio todo: use Insert as RESET?)
+                    _ => return,
+                }
+            }
+            Key::Character(key) if key.len() == 1 => key.as_bytes()[0],
+            _ => return,
+        };
+
+        self.mem.lock().unwrap().key_down(ascii_code);
+    }
+
     fn redraw(&mut self) -> StdResult<(), SoftBufferError> {
         // We probably don't need to clone the whole 64KiB ram, but this seems
         // fine for now.
         let mem = self.mem.lock().unwrap().clone();
+
+        // TODO at some point: render all 3 screens, for easier debugging.
         // let dots = gr::dots(mem.gr_page1());
-        // let dots = text::dots(mem.gr_page1());
-        let dots = hgr::dots_color(mem.hgr_page1());
+        let dots = text::dots(mem.gr_page1());
+        // let dots = hgr::dots_color(mem.hgr_page1());
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(
@@ -205,7 +241,7 @@ impl ApplicationHandler for App {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        self.handle_window_event(event_loop, event).unwrap();
+        self.window_event(event_loop, event).unwrap();
     }
 
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, (): ()) {

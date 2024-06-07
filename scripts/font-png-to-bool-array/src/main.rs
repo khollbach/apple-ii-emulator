@@ -48,7 +48,9 @@ fn main() -> Result<()> {
         for (x, &byte) in row.iter().enumerate() {
             let x = x as u32;
             let y = y as u32;
-            if (x, y) == (n_cols - 1, n_rows - 1) {
+
+            // Skip the block.
+            if (x, y) == (n_cols - 2, n_rows - 1) {
                 continue;
             }
 

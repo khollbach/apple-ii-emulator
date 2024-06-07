@@ -45,7 +45,8 @@ impl Mem {
     }
 
     pub fn key_down(&mut self, ascii_code: u8) {
-        todo!();
+        assert!(ascii_code < 0x80);
+        self.ram[0xc000] = ascii_code | 0x80;
     }
 
     fn trigger_soft_switches(&mut self, addr: u16) {
