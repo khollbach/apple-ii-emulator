@@ -2,4 +2,6 @@ next steps:
 * maybe hand-write a trivial "echo" program to test keyboard / screen
     > the goal is to be simpler than BASIC and sysmon, and thus easier
       to debug
-
+* another possible angle could be to debug individual monitor IO routines,
+  one at a time, and check that they have the intended behaviour.
+    * this seems more tractable than just single-stepping the sysmon code
