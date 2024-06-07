@@ -5,3 +5,4 @@ next steps:
 * another possible angle could be to debug individual monitor IO routines,
   one at a time, and check that they have the intended behaviour.
     * this seems more tractable than just single-stepping the sysmon code
+    * see the TRM, page ~62 for ROM routine docs
