@@ -6,3 +6,4 @@ next steps:
   one at a time, and check that they have the intended behaviour.
     * this seems more tractable than just single-stepping the sysmon code
     * see the TRM, page ~62 for ROM routine docs
+* or maybe we just debug the BASIC crash? I mean, how hard can it be...
