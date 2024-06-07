@@ -2,7 +2,6 @@ mod arith;
 mod debugger;
 mod flags;
 mod instr;
-mod opcode;
 mod operand;
 
 use std::fmt;
@@ -19,7 +18,6 @@ pub struct Cpu {
     pc: u16,
     sp: u8,
     flags: Flags,
-
     a: u8,
     x: u8,
     y: u8,
@@ -31,7 +29,6 @@ impl Cpu {
             pc: start_addr,
             sp: u8::MAX,
             flags: Flags { bits: 0 },
-
             a: 0,
             x: 0,
             y: 0,
@@ -39,7 +36,7 @@ impl Cpu {
     }
 
     pub fn step(&mut self, mem: &mut impl Memory) {
-        let (instr, mode) = opcode::decode(mem.get(self.pc));
+        let (instr, mode) = instr::decode(mem.get(self.pc));
         let loc = Operand::new(self, mem, mode);
 
         let mut pc_set = false;

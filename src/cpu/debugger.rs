@@ -9,7 +9,7 @@ use std::{
 
 use super::instr::Mode;
 use crate::{
-    cpu::{opcode, Cpu},
+    cpu::{instr, Cpu},
     hex,
     memory::Memory,
 };
@@ -54,7 +54,7 @@ impl Debugger {
 
         if self.single_step {
             eprintln!("{:?}", self.cpu);
-            let (instr, mode) = opcode::decode(mem.get(self.cpu.pc));
+            let (instr, mode) = instr::decode(mem.get(self.cpu.pc));
             let instr_bytes = &curr_instr(&self.cpu, &mut *mem)[..mode.instr_len() as usize];
             eprintln!("next instr: {:02x?} {:?} {:?}", instr_bytes, instr, mode);
 
@@ -106,7 +106,7 @@ fn would_halt_jmp(cpu: &Cpu, mem: &mut impl Memory) -> bool {
 }
 
 fn would_halt_branch(cpu: &Cpu, mem: &mut impl Memory) -> bool {
-    let (instr, mode) = opcode::decode(mem.get(cpu.pc));
+    let (instr, mode) = instr::decode(mem.get(cpu.pc));
     let is_branch = mode == Mode::Relative;
     let in_place = mem.get(cpu.pc + 1) as i8 == -2;
     is_branch && in_place && cpu.would_branch(instr)
