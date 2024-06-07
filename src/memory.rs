@@ -44,6 +44,10 @@ impl Mem {
         &self.ram[0x2000..0x4000]
     }
 
+    pub fn key_down(&mut self, ascii_code: u8) {
+        todo!();
+    }
+
     fn trigger_soft_switches(&mut self, addr: u16) {
         if addr == 0xc010 {
             // Clear keyboard strobe.

@@ -3,6 +3,7 @@ use crate::{
     memory::Memory,
 };
 
+/// This abstracts away the details of addressing modes.
 #[derive(Debug, Clone, Copy)]
 pub enum Operand {
     Memory { addr: u16 },
