@@ -14,13 +14,13 @@ use crate::memory::Memory;
 
 #[derive(Clone)]
 pub struct Cpu {
-    pub pc: u16,
-    pub sp: u8,
-    pub flags: Flags,
+    pc: u16,
+    sp: u8,
+    flags: Flags,
 
-    pub a: u8,
-    pub x: u8,
-    pub y: u8,
+    a: u8,
+    x: u8,
+    y: u8,
 
     pub mem: Memory,
 }
