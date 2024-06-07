@@ -1,4 +1,4 @@
-//! Misc arithmetic helper functions for CPU operations.
+//! Misc arithmetic helper functions.
 
 /// Perform addition, detecting signed integer overflows.
 pub fn add(x: u8, y: u8, carry_in: bool) -> Add {

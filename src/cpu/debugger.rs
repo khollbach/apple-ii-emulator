@@ -93,7 +93,7 @@ fn curr_instr(cpu: &Cpu, mem: &mut impl Memory) -> [u8; 3] {
     [mem.get(cpu.pc), mem.get(cpu.pc + 1), mem.get(cpu.pc + 2)]
 }
 
-/// Hack for testing: detect a "halt" instruction.
+/// Detect a "halt" instruction.
 fn would_halt(cpu: &Cpu, mem: &mut impl Memory) -> bool {
     would_halt_jmp(cpu, mem) || would_halt_branch(cpu, mem)
 }

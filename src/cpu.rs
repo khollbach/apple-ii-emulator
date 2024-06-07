@@ -47,17 +47,17 @@ impl Cpu {
             Instr::Brk => panic!("brk at 0x{:04x}", self.pc),
             Instr::Nop => (),
 
-            Instr::Tax => self.x = self.nz(self.a),
-            Instr::Txa => self.a = self.nz(self.x),
-            Instr::Tay => self.y = self.nz(self.a),
-            Instr::Tya => self.a = self.nz(self.y),
+            Instr::Tax => self.x = self.flags.nz(self.a),
+            Instr::Txa => self.a = self.flags.nz(self.x),
+            Instr::Tay => self.y = self.flags.nz(self.a),
+            Instr::Tya => self.a = self.flags.nz(self.y),
             Instr::Txs => self.sp = self.x,
-            Instr::Tsx => self.x = self.nz(self.sp),
+            Instr::Tsx => self.x = self.flags.nz(self.sp),
 
             Instr::Pha => self.push(mem, self.a),
             Instr::Pla => {
                 let v = self.pop(mem);
-                self.a = self.nz(v);
+                self.a = self.flags.nz(v);
             }
             Instr::Php => {
                 let mut f = self.flags.clone();
@@ -67,23 +67,23 @@ impl Cpu {
             }
             Instr::Plp => self.flags.bits = self.pop(mem),
 
-            Instr::Lda => self.a = self.nz(loc.get(self, mem)),
-            Instr::Ldx => self.x = self.nz(loc.get(self, mem)),
-            Instr::Ldy => self.y = self.nz(loc.get(self, mem)),
+            Instr::Lda => self.a = self.flags.nz(loc.get(self, mem)),
+            Instr::Ldx => self.x = self.flags.nz(loc.get(self, mem)),
+            Instr::Ldy => self.y = self.flags.nz(loc.get(self, mem)),
             Instr::Sta => loc.set(self, mem, self.a),
             Instr::Stx => loc.set(self, mem, self.x),
             Instr::Sty => loc.set(self, mem, self.y),
 
-            Instr::Inx => self.x = self.nz(self.x.wrapping_add(1)),
-            Instr::Dex => self.x = self.nz(self.x.wrapping_sub(1)),
-            Instr::Iny => self.y = self.nz(self.y.wrapping_add(1)),
-            Instr::Dey => self.y = self.nz(self.y.wrapping_sub(1)),
+            Instr::Inx => self.x = self.flags.nz(self.x.wrapping_add(1)),
+            Instr::Dex => self.x = self.flags.nz(self.x.wrapping_sub(1)),
+            Instr::Iny => self.y = self.flags.nz(self.y.wrapping_add(1)),
+            Instr::Dey => self.y = self.flags.nz(self.y.wrapping_sub(1)),
             Instr::Inc => {
-                let v = self.nz(loc.get(self, mem).wrapping_add(1));
+                let v = self.flags.nz(loc.get(self, mem).wrapping_add(1));
                 loc.set(self, mem, v);
             }
             Instr::Dec => {
-                let v = self.nz(loc.get(self, mem).wrapping_sub(1));
+                let v = self.flags.nz(loc.get(self, mem).wrapping_sub(1));
                 loc.set(self, mem, v);
             }
 
@@ -95,9 +95,9 @@ impl Cpu {
             Instr::Cld => self.flags.clear(Flag::Decimal),
             Instr::Sed => self.flags.set(Flag::Decimal),
 
-            Instr::And => self.a = self.nz(self.a & loc.get(self, mem)),
-            Instr::Ora => self.a = self.nz(self.a | loc.get(self, mem)),
-            Instr::Eor => self.a = self.nz(self.a ^ loc.get(self, mem)),
+            Instr::And => self.a = self.flags.nz(self.a & loc.get(self, mem)),
+            Instr::Ora => self.a = self.flags.nz(self.a | loc.get(self, mem)),
+            Instr::Eor => self.a = self.flags.nz(self.a ^ loc.get(self, mem)),
 
             Instr::Adc => self.adc(self.a, loc.get(self, mem)),
             Instr::Sbc => self.adc(self.a, !loc.get(self, mem)),
@@ -164,25 +164,16 @@ impl Cpu {
         }
     }
 
-    /// Update negative and zero flags, based on the value.
-    ///
-    /// Return the value, for convenience.
-    fn nz(&mut self, value: u8) -> u8 {
-        self.flags.assign(Flag::Zero, value == 0);
-        self.flags.assign(Flag::Negative, (value as i8) < 0);
-        value
-    }
-
     fn adc(&mut self, arg1: u8, arg2: u8) {
         let ret = arith::add(arg1, arg2, self.flags.is_set(Flag::Carry));
-        self.a = self.nz(ret.sum);
+        self.a = self.flags.nz(ret.sum);
         self.flags.assign(Flag::Carry, ret.carry);
         self.flags.assign(Flag::Overflow, ret.overflow);
     }
 
     fn cmp(&mut self, arg1: u8, arg2: u8) {
         let ret = arith::add(arg1, !arg2, true);
-        self.nz(ret.sum);
+        self.flags.nz(ret.sum);
         self.flags.assign(Flag::Carry, ret.carry);
     }
 
@@ -192,7 +183,7 @@ impl Cpu {
             v |= 1;
         }
         loc.set(self, mem, v);
-        self.nz(v);
+        self.flags.nz(v);
         self.flags.assign(Flag::Carry, c);
     }
 
@@ -202,7 +193,7 @@ impl Cpu {
             v |= 0x80;
         }
         loc.set(self, mem, v);
-        self.nz(v);
+        self.flags.nz(v);
         self.flags.assign(Flag::Carry, c);
     }
 
@@ -222,7 +213,7 @@ impl Cpu {
     }
 }
 
-/// Stack ops.
+/// Stack operations.
 impl Cpu {
     fn push(&mut self, mem: &mut impl Memory, value: u8) {
         mem.set(0x0100 + self.sp as u16, value);

@@ -36,4 +36,13 @@ impl Flags {
     pub fn is_set(&self, flag: Flag) -> bool {
         self.bits & (flag as u8) != 0
     }
+
+    /// Update negative and zero flags, based on the value.
+    ///
+    /// Return the value, for convenience.
+    pub fn nz(&mut self, value: u8) -> u8 {
+        self.assign(Flag::Zero, value == 0);
+        self.assign(Flag::Negative, (value as i8) < 0);
+        value
+    }
 }
