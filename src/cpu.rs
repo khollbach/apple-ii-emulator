@@ -37,7 +37,7 @@ impl Cpu {
 
     pub fn step(&mut self, mem: &mut impl Memory) {
         let (instr, mode) = instr::decode(mem.get(self.pc));
-        let loc = Operand::new(self, mem, mode);
+        let arg = Operand::new(self, mem, mode);
 
         let mut pc_set = false;
         match instr {
@@ -64,24 +64,24 @@ impl Cpu {
             }
             Instr::Plp => self.flags.bits = self.pop(mem),
 
-            Instr::Lda => self.a = self.flags.nz(loc.get(self, mem)),
-            Instr::Ldx => self.x = self.flags.nz(loc.get(self, mem)),
-            Instr::Ldy => self.y = self.flags.nz(loc.get(self, mem)),
-            Instr::Sta => loc.set(self, mem, self.a),
-            Instr::Stx => loc.set(self, mem, self.x),
-            Instr::Sty => loc.set(self, mem, self.y),
+            Instr::Lda => self.a = self.flags.nz(arg.get(self, mem)),
+            Instr::Ldx => self.x = self.flags.nz(arg.get(self, mem)),
+            Instr::Ldy => self.y = self.flags.nz(arg.get(self, mem)),
+            Instr::Sta => arg.set(self, mem, self.a),
+            Instr::Stx => arg.set(self, mem, self.x),
+            Instr::Sty => arg.set(self, mem, self.y),
 
             Instr::Inx => self.x = self.flags.nz(self.x.wrapping_add(1)),
             Instr::Dex => self.x = self.flags.nz(self.x.wrapping_sub(1)),
             Instr::Iny => self.y = self.flags.nz(self.y.wrapping_add(1)),
             Instr::Dey => self.y = self.flags.nz(self.y.wrapping_sub(1)),
             Instr::Inc => {
-                let v = self.flags.nz(loc.get(self, mem).wrapping_add(1));
-                loc.set(self, mem, v);
+                let v = self.flags.nz(arg.get(self, mem).wrapping_add(1));
+                arg.set(self, mem, v);
             }
             Instr::Dec => {
-                let v = self.flags.nz(loc.get(self, mem).wrapping_sub(1));
-                loc.set(self, mem, v);
+                let v = self.flags.nz(arg.get(self, mem).wrapping_sub(1));
+                arg.set(self, mem, v);
             }
 
             Instr::Clc => self.flags.clear(Flag::Carry),
@@ -92,37 +92,37 @@ impl Cpu {
             Instr::Cld => self.flags.clear(Flag::Decimal),
             Instr::Sed => self.flags.set(Flag::Decimal),
 
-            Instr::And => self.a = self.flags.nz(self.a & loc.get(self, mem)),
-            Instr::Ora => self.a = self.flags.nz(self.a | loc.get(self, mem)),
-            Instr::Eor => self.a = self.flags.nz(self.a ^ loc.get(self, mem)),
+            Instr::And => self.a = self.flags.nz(self.a & arg.get(self, mem)),
+            Instr::Ora => self.a = self.flags.nz(self.a | arg.get(self, mem)),
+            Instr::Eor => self.a = self.flags.nz(self.a ^ arg.get(self, mem)),
 
-            Instr::Adc => self.adc(self.a, loc.get(self, mem)),
-            Instr::Sbc => self.adc(self.a, !loc.get(self, mem)),
-            Instr::Cmp => self.cmp(self.a, loc.get(self, mem)),
-            Instr::Cpx => self.cmp(self.x, loc.get(self, mem)),
-            Instr::Cpy => self.cmp(self.y, loc.get(self, mem)),
+            Instr::Adc => self.adc(self.a, arg.get(self, mem)),
+            Instr::Sbc => self.adc(self.a, !arg.get(self, mem)),
+            Instr::Cmp => self.cmp(self.a, arg.get(self, mem)),
+            Instr::Cpx => self.cmp(self.x, arg.get(self, mem)),
+            Instr::Cpy => self.cmp(self.y, arg.get(self, mem)),
 
             Instr::Asl => {
                 self.flags.clear(Flag::Carry);
-                let v = self.rol(loc.get(self, mem));
-                loc.set(self, mem, v);
+                let v = self.rol(arg.get(self, mem));
+                arg.set(self, mem, v);
             }
             Instr::Lsr => {
                 self.flags.clear(Flag::Carry);
-                let v = self.ror(loc.get(self, mem));
-                loc.set(self, mem, v);
+                let v = self.ror(arg.get(self, mem));
+                arg.set(self, mem, v);
             }
             Instr::Rol => {
-                let v = self.rol(loc.get(self, mem));
-                loc.set(self, mem, v);
+                let v = self.rol(arg.get(self, mem));
+                arg.set(self, mem, v);
             }
             Instr::Ror => {
-                let v = self.ror(loc.get(self, mem));
-                loc.set(self, mem, v);
+                let v = self.ror(arg.get(self, mem));
+                arg.set(self, mem, v);
             }
 
             Instr::Bit => {
-                let v = loc.get(self, mem);
+                let v = arg.get(self, mem);
                 self.flags.assign(Flag::Negative, v & 0x80 != 0);
                 self.flags.assign(Flag::Overflow, v & 0x40 != 0);
                 self.flags.assign(Flag::Zero, (v & self.a) == 0);
@@ -137,19 +137,19 @@ impl Cpu {
             | Instr::Bne
             | Instr::Beq) => {
                 if self.would_branch(b) {
-                    self.pc = loc.addr();
+                    self.pc = arg.addr();
                     pc_set = true;
                 }
             }
 
             Instr::Jmp => {
-                self.pc = loc.addr();
+                self.pc = arg.addr();
                 pc_set = true;
             }
             Instr::Jsr => {
                 let return_addr_minus_one = self.pc.checked_add(2).unwrap();
                 self.push2(mem, return_addr_minus_one);
-                self.pc = loc.addr();
+                self.pc = arg.addr();
                 pc_set = true;
             }
             Instr::Rts => {

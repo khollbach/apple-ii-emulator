@@ -81,9 +81,8 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// How many bytes long is this instruction, *not* including the opcode.
-    pub fn arg_len(self) -> u16 {
-        match self {
+    pub fn instr_len(self) -> u16 {
+        let arg_len = match self {
             Mode::Implied => 0,
             Mode::Accumulator => 0,
 
@@ -103,11 +102,9 @@ impl Mode {
             Mode::AbsoluteY => 2,
 
             Mode::Indirect => 2,
-        }
-    }
+        };
 
-    pub fn instr_len(self) -> u16 {
-        1 + self.arg_len()
+        1 + arg_len
     }
 }
 

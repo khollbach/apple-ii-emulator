@@ -14,7 +14,8 @@ pub enum Operand {
 
 impl Operand {
     pub fn new(cpu: &Cpu, mem: &mut impl Memory, mode: Mode) -> Self {
-        let arg: u16 = match mode.arg_len() {
+        let arg_len = mode.instr_len() - 1;
+        let arg: u16 = match arg_len {
             0 => 0,
             1 => mem.get(cpu.pc.checked_add(1).unwrap()).into(),
             2 => mem.get_word(cpu.pc.checked_add(1).unwrap()),
