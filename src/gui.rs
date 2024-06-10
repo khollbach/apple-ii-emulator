@@ -25,6 +25,7 @@ use crate::{
     cpu::{Cpu, Debugger},
     display::{color::Color, gr, hgr, text},
     memory::Memory,
+    Emulator,
 };
 
 /// What is the side-length (in physical pixels) of an emulated pixel (i.e. a
@@ -36,27 +37,28 @@ const DESIRED_WINDOW_SIZE: PhysicalSize<u32> =
 
 type StdResult<T, E> = std::result::Result<T, E>;
 
-pub struct WinitGui {
+/// Winit app.
+pub struct Gui {
     window: Option<Rc<Window>>,
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     occluded: bool,
     window_size: PhysicalSize<u32>,
-    mem: Arc<Mutex<Memory>>,
+    emu: Arc<Mutex<Emulator>>,
 }
 
-impl WinitGui {
-    pub fn new(mem: Arc<Mutex<Memory>>) -> Self {
+impl Gui {
+    pub fn new(emu: Arc<Mutex<Emulator>>) -> Self {
         Self {
             window: None,
             surface: None,
             occluded: false,
             window_size: DESIRED_WINDOW_SIZE,
-            mem,
+            emu,
         }
     }
 }
 
-impl ApplicationHandler for WinitGui {
+impl ApplicationHandler for Gui {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() {
             self.create_window(event_loop).unwrap();
@@ -77,7 +79,7 @@ impl ApplicationHandler for WinitGui {
     }
 }
 
-impl WinitGui {
+impl Gui {
     fn create_window(&mut self, event_loop: &ActiveEventLoop) -> StdResult<(), Box<dyn Error>> {
         assert!(self.window.is_none());
 
@@ -167,18 +169,20 @@ impl WinitGui {
             _ => return,
         };
 
-        self.mem.lock().unwrap().key_down(ascii_code);
+        // todo: generate all_key_up events as well
+
+        self.emu.lock().unwrap().key_down(ascii_code);
     }
 
     fn redraw(&mut self) -> StdResult<(), SoftBufferError> {
-        // We probably don't need to clone the whole 64KiB ram, but this seems
-        // fine for now.
-        let mem = self.mem.lock().unwrap().clone();
-
-        // TODO at some point: render all 3 screens, for easier debugging.
-        // let dots = gr::dots(mem.gr_page1());
-        let dots = text::dots(mem.gr_page1());
-        // let dots = hgr::dots_color(mem.hgr_page1());
+        // todo: maybe this is holding the lock for too long?
+        // * could be interesting to investigate, at some point
+        // * if it *was* an issue, one simple fix would be
+        //      1. claim the lock
+        //      2. copy out just the slice of memory we care about
+        //      3. release the lock
+        //      4. then do the conversion from bytes to dots
+        let dots = self.emu.lock().unwrap().draw_screen();
 
         let surface = self.surface.as_mut().unwrap();
         surface.resize(
