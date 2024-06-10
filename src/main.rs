@@ -13,13 +13,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use apple_ii_emulator::{
-    cpu::{Cpu, Debugger},
-    gui::Gui,
-    hex,
-    memory::Memory,
-    Emulator,
-};
+use apple_ii_emulator::{gui::Gui, hex, Emulator};
 use clap::{command, Parser};
 use itertools::Itertools;
 use winit::event_loop::{EventLoop, EventLoopClosed};
@@ -58,7 +52,10 @@ fn main() -> Result<()> {
     thread::spawn(move || run_cpu(emu1));
 
     let emu1 = Arc::clone(&emu);
-    thread::spawn(move || run_debugger(emu1));
+    thread::spawn(move || match run_debugger(emu1) {
+        Ok(()) => (),
+        Err(e) => eprintln!("\n{e}"),
+    });
 
     // Re-draw the screen at 60 Hz. This isn't the "right" way to do it, but
     // it's probably fine for now. See the winit docs for more ideas.

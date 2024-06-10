@@ -22,7 +22,7 @@ use winit::{
 };
 
 use crate::{
-    cpu::{Cpu, Debugger},
+    cpu::Cpu,
     display::{color::Color, gr, hgr, text},
     memory::Memory,
     Emulator,

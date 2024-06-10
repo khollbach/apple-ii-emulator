@@ -2,15 +2,15 @@
 
 use cpu::Cpu;
 use debugger::Command;
-use display::{color::Color, text};
+use display::{color::Color, gr, hgr, text};
 use memory::Memory;
 
-pub mod cpu;
-pub mod debugger;
-pub mod display;
+mod cpu;
+mod debugger;
+mod display;
 pub mod gui;
 pub mod hex;
-pub mod memory;
+mod memory;
 
 pub struct Emulator {
     cpu: Cpu,
@@ -62,9 +62,16 @@ impl Emulator {
         // TODO at some point:
         // * maybe render all 3 screens, for easier debugging ?
 
-        // gr::dots(mem.gr_page1())
+        // todo:
+        // * impl soft switches for toggling b/w (fullscreen) display modes
+        // * (mixed mode is much lower prio)
+
+        // ignore unused code
+        let _ = gr::dots(self.mem.gr_page1());
+        let _ = hgr::dots_color(self.mem.hgr_page1());
+        let _ = hgr::dots_bw(self.mem.hgr_page1());
+
         text::dots(self.mem.gr_page1())
-        // hgr::dots_color(mem.hgr_page1())
     }
 
     pub fn key_down(&mut self, ascii_code: u8) {

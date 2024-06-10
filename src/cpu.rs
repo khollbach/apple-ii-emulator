@@ -1,12 +1,12 @@
 mod arith;
-mod debugger;
+mod debugging;
 mod flags;
 mod instr;
 mod operand;
+mod tmp;
 
 use std::fmt;
 
-pub use debugger::Debugger;
 use flags::{Flag, Flags};
 use instr::{Instr, Mode};
 use operand::Operand;
