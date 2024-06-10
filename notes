@@ -10,6 +10,9 @@ next steps:
 
 ---
 
+first:
+* move gui to main
+
 interlude: implement a more useful debugger
 * start by just impl'ing "halt", as a "hello world"
 * then think about how to structure the code
