@@ -14,7 +14,7 @@ use std::{
 use anyhow::{Context as _, Result};
 use apple_ii_emulator::{
     cpu::{Cpu, Debugger},
-    display::{gr, hgr, text},
+    display::{color::Color, gr, hgr, text},
     memory::{Mem, Memory},
 };
 use itertools::Itertools;
@@ -30,10 +30,12 @@ use winit::{
 
 type StdResult<T, E> = std::result::Result<T, E>;
 
-const DESIRED_WINDOW_SIZE: PhysicalSize<u32> = {
-    let scale = 1; // todo: support non-trivial scaling (low prio for now)
-    PhysicalSize::new(hgr::W as u32 * scale, hgr::H as u32 * scale)
-};
+/// What is the side-length (in physical pixels) of an emulated pixel (i.e. a
+/// "dot of light" on the CRT display).
+const SCALE: usize = 2;
+
+const DESIRED_WINDOW_SIZE: PhysicalSize<u32> =
+    PhysicalSize::new(hgr::W as u32 * SCALE as u32, hgr::H as u32 * SCALE as u32);
 
 fn main() -> Result<()> {
     let (filename,) = env::args()
@@ -207,17 +209,26 @@ impl App {
         )?;
 
         let mut buf = surface.buffer_mut()?;
-        for y in 0..hgr::H {
-            for x in 0..hgr::W {
-                let rgb = dots[y][x].rgb();
-                buf[y * hgr::W + x] = pack_rgb(rgb);
-            }
-        }
+        paint_surface(&dots, &mut buf);
 
         self.window.as_ref().unwrap().pre_present_notify();
         buf.present()?;
 
         Ok(())
+    }
+}
+
+fn paint_surface(dots: &Vec<Vec<Color>>, buf: &mut [u32]) {
+    for y in 0..hgr::H {
+        for x in 0..hgr::W {
+            let rgb = dots[y][x].rgb();
+            let pixel = pack_rgb(rgb);
+            for i in 0..SCALE {
+                let row = y * SCALE + i;
+                let col = x;
+                buf[(row * hgr::W + col) * SCALE..][..SCALE].fill(pixel);
+            }
+        }
     }
 }
 
