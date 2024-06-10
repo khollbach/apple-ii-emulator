@@ -11,7 +11,7 @@ next steps:
 ---
 
 first:
-* move gui to main
+/ move gui to main
 
 interlude: implement a more useful debugger
 * start by just impl'ing "halt", as a "hello world"
@@ -19,5 +19,4 @@ interlude: implement a more useful debugger
     * e.g.: 1. parse command; 2. execute command
 * write down the steps, in order, you'll do to impl the MVP
     (h, c, b, s)
-
 
