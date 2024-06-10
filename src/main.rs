@@ -4,7 +4,10 @@ use std::{
     env,
     fs::File,
     io::{self, prelude::*},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering::Relaxed},
+        Arc, Mutex,
+    },
     thread,
     time::Duration,
 };
@@ -35,10 +38,6 @@ struct Args {
     /// Memory address of the first instruction to start executing.
     #[arg(long, default_value = "$6000")]
     start_addr: String,
-
-    /// Disable debugger.
-    #[arg(long)]
-    no_debug: bool,
 }
 
 fn main() -> Result<()> {
@@ -51,30 +50,28 @@ fn main() -> Result<()> {
     let mut mem = Mem::new(&prog, hex::decode_u16(&args.load_addr)?);
     let pc = mem.set_softev(hex::decode_u16(&args.start_addr)?);
 
-    // This feels like this is a kludgy way to use locks, but I guess we'll keep
-    // it this way for now:
-    // * the `cpu` is shared between the cpu thread and the debugger thread
-    //      * they use it for control-flow: when the debugger wants to halt the cpu thread
-    //        it grabs the cpu lock
+    // These locks feels slightly kludgy, but I guess we'll keep it this way for
+    // now:
+    // * `cpu` is shared between: cpu thread, debugger thread
     // * `mem` is shared between all 3 threads: cpu, debugger, ui
-    //      * nobody holds this lock for long.
-    //      * the cpu-thread and debbuger-thread only grab `mem` once they've
-    //        already locked `cpu`. This is important to avoid deadlock.
-    let shared_cpu = Arc::new(Mutex::new(Cpu::new(pc)));
+    // * The cpu-thread and debbuger-thread only grab `mem` once they've
+    //   already locked `cpu`. This is important to avoid deadlock.
+    let shared_cpu = Arc::new(Mutex::new(Debugger::new(pc)));
     let shared_mem = Arc::new(Mutex::new(mem));
+    let shared_halt = Arc::new(AtomicBool::new(false));
 
     let cpu = Arc::clone(&shared_cpu);
     let mem = Arc::clone(&shared_mem);
-    thread::spawn(move || run_cpu(cpu, mem));
+    let halt = Arc::clone(&shared_halt);
+    thread::spawn(move || run_cpu(cpu, mem, halt));
 
-    if !args.no_debug {
-        let cpu = Arc::clone(&shared_cpu);
-        let mem = Arc::clone(&shared_mem);
-        thread::spawn(move || match run_debugger(cpu, mem) {
-            Ok(()) => (),
-            Err(e) => eprintln!("\n{e}"),
-        });
-    }
+    let cpu = Arc::clone(&shared_cpu);
+    let mem = Arc::clone(&shared_mem);
+    let halt = Arc::clone(&shared_halt);
+    thread::spawn(move || match run_debugger(cpu, mem, halt) {
+        Ok(()) => (),
+        Err(e) => eprintln!("\n{e}"),
+    });
 
     // Re-draw the screen at 60 Hz. This isn't the "right" way to do it, but
     // it's probably fine for now. See the winit docs for more ideas.
@@ -93,24 +90,32 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_cpu(cpu: Arc<Mutex<Cpu>>, mem: Arc<Mutex<Mem>>) {
+fn run_cpu(cpu: Arc<Mutex<Debugger>>, mem: Arc<Mutex<Mem>>, halt: Arc<AtomicBool>) {
     loop {
         // hack: since 1 cycle != 1 instr, let's slow down a bit
         // Could look into cycle-accuracy at some point maybe (low-prio)
         // thread::sleep(Duration::from_millis(1));
         thread::sleep(Duration::from_millis(3));
 
+        if halt.load(Relaxed) {
+            continue;
+        }
+
         let mut cpu = cpu.lock().unwrap();
         let mut mem = mem.lock().unwrap();
         for _ in 0..1_000 {
-            cpu.step(&mut *mem);
+            if cpu.step(&mut *mem).is_break() {
+                halt.store(true, Relaxed);
+            }
         }
     }
 }
 
-fn run_debugger(cpu: Arc<Mutex<Cpu>>, mem: Arc<Mutex<Mem>>) -> Result<()> {
-    let mut locked_cpu = None;
-
+fn run_debugger(
+    cpu: Arc<Mutex<Debugger>>,
+    mem: Arc<Mutex<Mem>>,
+    halt: Arc<AtomicBool>,
+) -> Result<()> {
     let mut lines = io::stdin().lines();
     loop {
         print!("> ");
@@ -125,13 +130,28 @@ fn run_debugger(cpu: Arc<Mutex<Cpu>>, mem: Arc<Mutex<Mem>>) -> Result<()> {
             }
         };
 
-        locked_cpu = Some(cpu.lock().unwrap());
+        let mut cpu = cpu.lock().unwrap();
+
+        let mut should_halt = true;
+        match cmd {
+            Command::Halt => (),
+            Command::Continue => should_halt = false,
+            Command::Step => {
+                cpu.step(&mut *mem.lock().unwrap());
+            }
+        }
+
+        halt.store(should_halt, Relaxed);
     }
 }
 
+/// CLI debugger command.
 #[derive(Debug)]
 enum Command {
     Halt,
+    Continue,
+    Step,
+    // Break,
 }
 
 impl Command {
@@ -140,6 +160,9 @@ impl Command {
 
         let cmd = match line {
             "h" | "halt" => Command::Halt,
+            "c" | "continue" => Command::Continue,
+            // Default to "step", if the user just presses enter.
+            "" | "s" | "step" => Command::Step,
             _ => bail!("invalid command: {line:?}"),
         };
 

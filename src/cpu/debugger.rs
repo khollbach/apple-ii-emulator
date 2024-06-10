@@ -3,7 +3,7 @@
 
 use std::{
     io,
-    ops::DerefMut,
+    ops::{ControlFlow, DerefMut},
     sync::{Arc, Mutex},
 };
 
@@ -18,7 +18,7 @@ pub struct Debugger {
     cpu: Cpu,
     num_instructions_executed: u64,
     breakpoints: Vec<u16>,
-    single_step: bool,
+    // single_step: bool,
 }
 
 impl Debugger {
@@ -28,25 +28,23 @@ impl Debugger {
             num_instructions_executed: 0,
             // add breakpoints here as needed
             breakpoints: vec![],
-            single_step: false,
+            // single_step: false,
         }
     }
 
-    pub fn step(&mut self, shared_mem: &Mutex<impl Memory>) {
-        let mut mem = shared_mem.lock().unwrap();
-
+    pub fn step(&mut self, mem: &mut impl Memory) -> ControlFlow<()> {
         if self.breakpoints.contains(&self.cpu.pc) {
-            self.single_step = true;
+            return ControlFlow::Break(());
         }
 
         if would_halt(&self.cpu, &mut *mem) {
             eprintln!("would halt");
-            self.single_step = true;
+            return ControlFlow::Break(());
         }
 
         if mem.get(self.cpu.pc) == 0 {
             eprintln!("would break");
-            self.single_step = true;
+            return ControlFlow::Break(());
         }
 
         // Detect long-running loops that aren't a simple "halt instruction".
@@ -57,48 +55,50 @@ impl Debugger {
             eprintln!();
         }
 
-        if self.single_step {
-            eprintln!("{:?}", self.cpu);
-            let (instr, mode) = instr::decode(mem.get(self.cpu.pc));
-            let instr_bytes = &curr_instr(&self.cpu, &mut *mem)[..mode.instr_len() as usize];
-            eprintln!("next instr: {:02x?} {:?} {:?}", instr_bytes, instr, mode);
+        // if self.single_step {
+        //     eprintln!("{:?}", self.cpu);
+        //     let (instr, mode) = instr::decode(mem.get(self.cpu.pc));
+        //     let instr_bytes = &curr_instr(&self.cpu, mem)[..mode.instr_len() as usize];
+        //     eprintln!("next instr: {:02x?} {:?} {:?}", instr_bytes, instr, mode);
 
-            loop {
-                // don't hold the lock while we're getting input
-                drop(mem);
-                let line: String = io::stdin().lines().next().unwrap().unwrap();
-                mem = shared_mem.lock().unwrap();
+        //     loop {
+        //         // don't hold the lock while we're getting input
+        //         // drop(mem);
+        //         let line: String = io::stdin().lines().next().unwrap().unwrap();
+        //         // mem = shared_mem.lock().unwrap();
 
-                let cmd = line.trim();
-                if cmd.is_empty() {
-                    break;
-                }
+        //         let cmd = line.trim();
+        //         if cmd.is_empty() {
+        //             break;
+        //         }
 
-                if cmd.contains('.') {
-                    let (start, end) = cmd.split_once('.').unwrap();
-                    let start = hex::decode_u16(start).unwrap();
-                    let end = hex::decode_u16(end).unwrap();
+        //         if cmd.contains('.') {
+        //             let (start, end) = cmd.split_once('.').unwrap();
+        //             let start = hex::decode_u16(start).unwrap();
+        //             let end = hex::decode_u16(end).unwrap();
 
-                    eprintln!("ram[${:04x}..=${:04x}]:", start, end);
-                    for addr in start..=end {
-                        eprint!("${:02x} ", mem.get(addr));
-                    }
-                    eprintln!();
-                    continue;
-                }
+        //             eprintln!("ram[${:04x}..=${:04x}]:", start, end);
+        //             for addr in start..=end {
+        //                 eprint!("${:02x} ", mem.get(addr));
+        //             }
+        //             eprintln!();
+        //             continue;
+        //         }
 
-                let is_valid = cmd.chars().all(|c| c.is_digit(16)) && cmd.len() <= 4;
-                if !is_valid {
-                    continue;
-                }
+        //         let is_valid = cmd.chars().all(|c| c.is_digit(16)) && cmd.len() <= 4;
+        //         if !is_valid {
+        //             continue;
+        //         }
 
-                let addr = hex::decode_u16(cmd).unwrap();
-                eprintln!("ram[${:04x}]: ${:02x}", addr, mem.get(addr));
-            }
-        }
+        //         let addr = hex::decode_u16(cmd).unwrap();
+        //         eprintln!("ram[${:04x}]: ${:02x}", addr, mem.get(addr));
+        //     }
+        // }
 
-        self.cpu.step(mem.deref_mut());
+        self.cpu.step(mem);
         self.num_instructions_executed += 1;
+
+        ControlFlow::Continue(())
     }
 }
 

@@ -127,7 +127,11 @@ impl WinitGui {
                 }
             }
 
-            WindowEvent::KeyboardInput { event, .. } => self.key_event(event),
+            WindowEvent::KeyboardInput {
+                event,
+                is_synthetic: false,
+                ..
+            } => self.key_event(event),
 
             _ => (),
         }
