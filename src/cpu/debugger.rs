@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct Debugger {
-    cpu: Cpu,
+    pub cpu: Cpu,
     num_instructions_executed: u64,
     breakpoints: Vec<u16>,
     // single_step: bool,
@@ -32,7 +32,7 @@ impl Debugger {
         }
     }
 
-    pub fn step(&mut self, mem: &mut impl Memory) -> ControlFlow<()> {
+    pub fn step(&mut self, mem: &mut Memory) -> ControlFlow<()> {
         if self.breakpoints.contains(&self.cpu.pc) {
             return ControlFlow::Break(());
         }
@@ -102,23 +102,23 @@ impl Debugger {
     }
 }
 
-fn curr_instr(cpu: &Cpu, mem: &mut impl Memory) -> [u8; 3] {
+fn curr_instr(cpu: &Cpu, mem: &mut Memory) -> [u8; 3] {
     [mem.get(cpu.pc), mem.get(cpu.pc + 1), mem.get(cpu.pc + 2)]
 }
 
 /// Detect a "halt" instruction.
-fn would_halt(cpu: &Cpu, mem: &mut impl Memory) -> bool {
+fn would_halt(cpu: &Cpu, mem: &mut Memory) -> bool {
     would_halt_jmp(cpu, mem) || would_halt_branch(cpu, mem)
 }
 
-fn would_halt_jmp(cpu: &Cpu, mem: &mut impl Memory) -> bool {
+fn would_halt_jmp(cpu: &Cpu, mem: &mut Memory) -> bool {
     let [lo, hi] = cpu.pc.to_le_bytes();
     let jmp_absolute = 0x4c;
     let halt = [jmp_absolute, lo, hi];
     curr_instr(cpu, mem) == halt
 }
 
-fn would_halt_branch(cpu: &Cpu, mem: &mut impl Memory) -> bool {
+fn would_halt_branch(cpu: &Cpu, mem: &mut Memory) -> bool {
     let (instr, mode) = instr::decode(mem.get(cpu.pc));
     let is_branch = mode == Mode::Relative;
     let in_place = mem.get(cpu.pc + 1) as i8 == -2;

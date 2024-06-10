@@ -24,7 +24,7 @@ use winit::{
 use crate::{
     cpu::{Cpu, Debugger},
     display::{color::Color, gr, hgr, text},
-    memory::{Mem, Memory},
+    memory::Memory,
 };
 
 /// What is the side-length (in physical pixels) of an emulated pixel (i.e. a
@@ -41,11 +41,11 @@ pub struct WinitGui {
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     occluded: bool,
     window_size: PhysicalSize<u32>,
-    mem: Arc<Mutex<Mem>>,
+    mem: Arc<Mutex<Memory>>,
 }
 
 impl WinitGui {
-    pub fn new(mem: Arc<Mutex<Mem>>) -> Self {
+    pub fn new(mem: Arc<Mutex<Memory>>) -> Self {
         Self {
             window: None,
             surface: None,

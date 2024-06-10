@@ -16,7 +16,7 @@ use anyhow::{bail, Context as _, Result};
 use apple_ii_emulator::{
     cpu::{Cpu, Debugger},
     hex,
-    memory::Mem,
+    memory::Memory,
     winit_gui::WinitGui,
 };
 use clap::{command, Parser};
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
     let mut prog = vec![];
     file.read_to_end(&mut prog)?;
 
-    let mut mem = Mem::new(&prog, hex::decode_u16(&args.load_addr)?);
+    let mut mem = Memory::new(&prog, hex::decode_u16(&args.load_addr)?);
     let pc = mem.set_softev(hex::decode_u16(&args.start_addr)?);
 
     // These locks feels slightly kludgy, but I guess we'll keep it this way for
@@ -90,7 +90,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_cpu(cpu: Arc<Mutex<Debugger>>, mem: Arc<Mutex<Mem>>, halt: Arc<AtomicBool>) {
+fn run_cpu(cpu: Arc<Mutex<Debugger>>, mem: Arc<Mutex<Memory>>, halt: Arc<AtomicBool>) {
     loop {
         // hack: since 1 cycle != 1 instr, let's slow down a bit
         // Could look into cycle-accuracy at some point maybe (low-prio)
@@ -113,7 +113,7 @@ fn run_cpu(cpu: Arc<Mutex<Debugger>>, mem: Arc<Mutex<Mem>>, halt: Arc<AtomicBool
 
 fn run_debugger(
     cpu: Arc<Mutex<Debugger>>,
-    mem: Arc<Mutex<Mem>>,
+    mem: Arc<Mutex<Memory>>,
     halt: Arc<AtomicBool>,
 ) -> Result<()> {
     let mut lines = io::stdin().lines();
@@ -140,8 +140,13 @@ fn run_debugger(
                 cpu.step(&mut *mem.lock().unwrap());
             }
         }
-
         halt.store(should_halt, Relaxed);
+        // todo: this synchronization feels kinda messy.
+        // Couldn't we just have a bunch of global state wrapped up in a single lock?
+
+        if should_halt {
+            eprintln!("{:?}", cpu.cpu);
+        }
     }
 }
 

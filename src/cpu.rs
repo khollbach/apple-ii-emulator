@@ -35,7 +35,7 @@ impl Cpu {
         }
     }
 
-    pub fn step(&mut self, mem: &mut impl Memory) {
+    pub fn step(&mut self, mem: &mut Memory) {
         let (instr, mode) = instr::decode(mem.get(self.pc));
         let arg = Operand::new(self, mem, mode);
 
@@ -220,17 +220,17 @@ impl Cpu {
 
 /// Stack operations.
 impl Cpu {
-    fn push(&mut self, mem: &mut impl Memory, value: u8) {
+    fn push(&mut self, mem: &mut Memory, value: u8) {
         mem.set(0x0100 + self.sp as u16, value);
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    fn pop(&mut self, mem: &mut impl Memory) -> u8 {
+    fn pop(&mut self, mem: &mut Memory) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         mem.get(0x0100 + self.sp as u16)
     }
 
-    fn push2(&mut self, mem: &mut impl Memory, word: u16) {
+    fn push2(&mut self, mem: &mut Memory, word: u16) {
         let [lo, hi] = u16::to_le_bytes(word);
 
         // The stack grows down, so this stores the bytes in little-endian
@@ -239,7 +239,7 @@ impl Cpu {
         self.push(mem, lo);
     }
 
-    fn pop2(&mut self, mem: &mut impl Memory) -> u16 {
+    fn pop2(&mut self, mem: &mut Memory) -> u16 {
         let lo = self.pop(mem);
         let hi = self.pop(mem);
         u16::from_le_bytes([lo, hi])

@@ -13,7 +13,7 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn new(cpu: &Cpu, mem: &mut impl Memory, mode: Mode) -> Self {
+    pub fn new(cpu: &Cpu, mem: &mut Memory, mode: Mode) -> Self {
         let arg_len = mode.instr_len() - 1;
         let arg: u16 = match arg_len {
             0 => 0,
@@ -65,7 +65,7 @@ impl Operand {
         }
     }
 
-    pub fn get(self, cpu: &Cpu, mem: &mut impl Memory) -> u8 {
+    pub fn get(self, cpu: &Cpu, mem: &mut Memory) -> u8 {
         match self {
             Self::Memory { addr } => mem.get(addr),
             Self::Literal { value } => value,
@@ -74,7 +74,7 @@ impl Operand {
         }
     }
 
-    pub fn set(self, cpu: &mut Cpu, mem: &mut impl Memory, value: u8) {
+    pub fn set(self, cpu: &mut Cpu, mem: &mut Memory, value: u8) {
         match self {
             Self::Memory { addr } => mem.set(addr, value),
             Self::Literal { .. } => panic!("cannot mutate literal value {self:?}"),

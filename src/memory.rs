@@ -1,39 +1,30 @@
 mod load_program;
 
-/// Interface between the CPU and the memory address space (including RAM, ROM,
-/// and I/O).
-pub trait Memory {
-    fn get(&mut self, addr: u16) -> u8;
-
-    fn set(&mut self, addr: u16, value: u8);
-
-    fn get_word(&mut self, addr: u16) -> u16 {
-        let lo = self.get(addr);
-        let hi = self.get(addr.checked_add(1).unwrap());
-        u16::from_le_bytes([lo, hi])
-    }
-}
-
+/// Everything in the memory address space (including RAM, ROM, and I/O).
 #[derive(Clone)]
-pub struct Mem {
+pub struct Memory {
     ram: Vec<u8>,
 }
 
-impl Memory for Mem {
-    fn get(&mut self, addr: u16) -> u8 {
+impl Memory {
+    pub fn new(program: &[u8], load_addr: u16) -> Self {
+        load_program::load_program(program, load_addr)
+    }
+
+    pub fn get(&mut self, addr: u16) -> u8 {
         self.trigger_soft_switches(addr);
         self.ram[addr as usize]
     }
 
-    fn set(&mut self, addr: u16, value: u8) {
+    pub fn get_word(&mut self, addr: u16) -> u16 {
+        let lo = self.get(addr);
+        let hi = self.get(addr.checked_add(1).unwrap());
+        u16::from_le_bytes([lo, hi])
+    }
+
+    pub fn set(&mut self, addr: u16, value: u8) {
         self.trigger_soft_switches(addr);
         self.ram[addr as usize] = value;
-    }
-}
-
-impl Mem {
-    pub fn new(program: &[u8], load_addr: u16) -> Self {
-        load_program::load_program(program, load_addr)
     }
 
     pub fn gr_page1(&self) -> &[u8] {

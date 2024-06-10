@@ -1,11 +1,11 @@
-use super::Mem;
+use super::Memory;
 
 struct Slice<'a> {
     offset: usize,
     bytes: &'a [u8],
 }
 
-pub fn load_program(program: &[u8], load_addr: u16) -> Mem {
+pub fn load_program(program: &[u8], load_addr: u16) -> Memory {
     let mut slices = vec![];
     slices.push(Slice {
         bytes: program,
@@ -48,5 +48,5 @@ pub fn load_program(program: &[u8], load_addr: u16) -> Mem {
     for s in slices {
         ram[s.offset..][..s.bytes.len()].copy_from_slice(s.bytes);
     }
-    Mem { ram }
+    Memory { ram }
 }
