@@ -44,6 +44,11 @@ impl Debugger {
             self.single_step = true;
         }
 
+        if mem.get(self.cpu.pc) == 0 {
+            eprintln!("would break");
+            self.single_step = true;
+        }
+
         // Detect long-running loops that aren't a simple "halt instruction".
         let i = self.num_instructions_executed;
         if i != 0 && i % 100_000_000 == 0 {
@@ -70,7 +75,15 @@ impl Debugger {
                 }
 
                 if cmd.contains('.') {
-                    eprintln!("not yet implemented: range of bytes");
+                    let (start, end) = cmd.split_once('.').unwrap();
+                    let start = hex::decode_u16(start).unwrap();
+                    let end = hex::decode_u16(end).unwrap();
+
+                    eprintln!("ram[${:04x}..=${:04x}]:", start, end);
+                    for addr in start..=end {
+                        eprint!("${:02x} ", mem.get(addr));
+                    }
+                    eprintln!();
                     continue;
                 }
 
