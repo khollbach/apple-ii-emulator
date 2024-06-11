@@ -24,7 +24,7 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(program: &[u8], load_addr: u16, start_addr: u16) -> Self {
+    pub fn new(program: &[u8], load_addr: u16, start_addr: u16, breakpoints: Vec<u16>) -> Self {
         let mut mem = Memory::new(&program, load_addr);
         let pc = mem.set_softev(start_addr);
 
@@ -33,7 +33,7 @@ impl Emulator {
             mem,
             halted: false,
             num_instructions_executed: 0,
-            breakpoints: vec![],
+            breakpoints,
         }
     }
 

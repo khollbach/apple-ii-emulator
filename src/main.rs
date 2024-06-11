@@ -33,10 +33,24 @@ struct Args {
     /// Memory address of the first instruction to execute.
     #[arg(long, default_value = "$6000")]
     start_addr: String,
+
+    /// Memory address to set a breakpoint in the debugger. Can be passed
+    /// multiple times.
+    #[arg(long)]
+    breakpoint: Vec<String>,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    let load_addr = hex::decode_u16(&args.load_addr)?;
+    let start_addr = hex::decode_u16(&args.start_addr)?;
+
+    let mut breakpoints = Vec::with_capacity(args.breakpoint.len());
+    for bp in args.breakpoint {
+        let addr = hex::decode_u16(&bp)?;
+        breakpoints.push(addr);
+    }
 
     let mut file = File::open(&args.program)?;
     let mut program = vec![];
@@ -44,8 +58,9 @@ fn main() -> Result<()> {
 
     let emu = Arc::new(Mutex::new(Emulator::new(
         &program,
-        hex::decode_u16(&args.load_addr)?,
-        hex::decode_u16(&args.start_addr)?,
+        load_addr,
+        start_addr,
+        breakpoints,
     )));
 
     let emu1 = Arc::clone(&emu);
