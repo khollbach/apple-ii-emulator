@@ -11,7 +11,7 @@ pub enum Flag {
     Negative = 1 << 7,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Flags {
     pub bits: u8,
 }

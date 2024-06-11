@@ -1,5 +1,6 @@
 use anyhow::{ensure, Result};
 
+/// Optional $ or 0x prefix.
 pub fn decode_u16(mut s: &str) -> Result<u16> {
     if let Some(stripped) = s.strip_prefix("$") {
         s = stripped;

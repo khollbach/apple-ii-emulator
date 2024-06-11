@@ -1,9 +1,7 @@
 mod arith;
-mod debugging;
-mod flags;
-mod instr;
-mod operand;
-mod tmp;
+pub mod flags;
+pub mod instr;
+pub mod operand;
 
 use std::fmt;
 
@@ -15,12 +13,12 @@ use crate::memory::Memory;
 
 #[derive(Clone)]
 pub struct Cpu {
-    pc: u16,
-    sp: u8,
-    flags: Flags,
-    a: u8,
-    x: u8,
-    y: u8,
+    pub pc: u16,
+    pub sp: u8,
+    pub flags: Flags,
+    pub a: u8,
+    pub x: u8,
+    pub y: u8,
 }
 
 impl Cpu {
@@ -35,9 +33,14 @@ impl Cpu {
         }
     }
 
-    pub fn step(&mut self, mem: &mut Memory) {
+    pub fn next_instr(&self, mem: &mut Memory) -> (Instr, Mode, Operand) {
         let (instr, mode) = instr::decode(mem.get(self.pc));
         let arg = Operand::new(self, mem, mode);
+        (instr, mode, arg)
+    }
+
+    pub fn step(&mut self, mem: &mut Memory) {
+        let (instr, mode, arg) = self.next_instr(mem);
 
         let mut pc_set = false;
         match instr {
@@ -136,7 +139,7 @@ impl Cpu {
             | Instr::Bcs
             | Instr::Bne
             | Instr::Beq) => {
-                if self.would_branch(b) {
+                if would_branch(b, self.flags) {
                     self.pc = arg.addr();
                     pc_set = true;
                 }
@@ -201,21 +204,21 @@ impl Cpu {
         self.flags.assign(Flag::Carry, c);
         out
     }
+}
 
-    fn would_branch(&self, branch: Instr) -> bool {
-        let (flag, when) = match branch {
-            Instr::Bpl => (Flag::Negative, false),
-            Instr::Bmi => (Flag::Negative, true),
-            Instr::Bvc => (Flag::Overflow, false),
-            Instr::Bvs => (Flag::Overflow, true),
-            Instr::Bcc => (Flag::Carry, false),
-            Instr::Bcs => (Flag::Carry, true),
-            Instr::Bne => (Flag::Zero, false),
-            Instr::Beq => (Flag::Zero, true),
-            _ => panic!("not a branch: {branch:?}"),
-        };
-        self.flags.is_set(flag) == when
-    }
+pub fn would_branch(branch: Instr, flags: Flags) -> bool {
+    let (flag, when) = match branch {
+        Instr::Bpl => (Flag::Negative, false),
+        Instr::Bmi => (Flag::Negative, true),
+        Instr::Bvc => (Flag::Overflow, false),
+        Instr::Bvs => (Flag::Overflow, true),
+        Instr::Bcc => (Flag::Carry, false),
+        Instr::Bcs => (Flag::Carry, true),
+        Instr::Bne => (Flag::Zero, false),
+        Instr::Beq => (Flag::Zero, true),
+        _ => panic!("not a branch: {branch:?}"),
+    };
+    flags.is_set(flag) == when
 }
 
 /// Stack operations.
@@ -246,6 +249,16 @@ impl Cpu {
     }
 }
 
+impl Cpu {
+    /// Detect a "halt" instruction.
+    pub fn would_halt(&self, mem: &mut Memory) -> bool {
+        let (instr, mode, arg) = self.next_instr(mem);
+        let abs_jmp = instr == Instr::Jmp && mode == Mode::Absolute;
+        let active_branch = mode == Mode::Relative && would_branch(instr, self.flags);
+        (abs_jmp || active_branch) && arg.addr() == self.pc
+    }
+}
+
 impl fmt::Debug for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pc: ${:04x}", self.pc)?;
@@ -255,6 +268,43 @@ impl fmt::Debug for Cpu {
         writeln!(f, "a: ${:02x}", self.a)?;
         writeln!(f, "x: ${:02x}", self.x)?;
         write!(f, "y: ${:02x}", self.y)?;
+        Ok(())
+    }
+}
+
+impl Cpu {
+    pub fn dbg(&self, mem: &mut Memory) -> CpuDbg {
+        let next_instr = self.next_instr(mem);
+
+        let mut next_instr_bytes = vec![];
+        for i in 0..next_instr.1.instr_len() {
+            let byte = mem.get(self.pc.checked_add(i).unwrap());
+            next_instr_bytes.push(byte);
+        }
+
+        CpuDbg {
+            cpu: self.clone(),
+            next_instr,
+            next_instr_bytes,
+        }
+    }
+}
+
+pub struct CpuDbg {
+    cpu: Cpu,
+    next_instr: (Instr, Mode, Operand),
+    next_instr_bytes: Vec<u8>,
+}
+
+impl fmt::Display for CpuDbg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{:?}", self.cpu)?;
+        write!(
+            f,
+            "next instr: {:02x?} {:?}",
+            self.next_instr_bytes, self.next_instr
+        )?;
+
         Ok(())
     }
 }

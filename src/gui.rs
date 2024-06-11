@@ -170,6 +170,8 @@ impl Gui {
         };
 
         // todo: generate all_key_up events as well
+        // * if we call it whenever *any* key we care about gets released, it'll
+        // probably feel "good enough" for now.
 
         self.emu.lock().unwrap().key_down(ascii_code);
     }

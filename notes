@@ -20,3 +20,11 @@ interlude: implement a more useful debugger
 * write down the steps, in order, you'll do to impl the MVP
     (h, c, b, s)
 
+---
+
+then:
+* make a list of hardware features to-do, + order them in terms of what you
+  want to impl first, + maybe try some with (tiny) "demo" ideas
+    (* could think about getting Rust toolchain up&running to make writing
+      demos more fun..)
+

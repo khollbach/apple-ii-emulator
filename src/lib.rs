@@ -1,12 +1,15 @@
 #![allow(unused_imports)] // todo
 
-use cpu::Cpu;
-use debugger::Command;
+use std::ops::ControlFlow;
+
+use commands::Command;
+use cpu::{instr::Instr, Cpu};
 use display::{color::Color, gr, hgr, text};
+use itertools::Itertools;
 use memory::Memory;
 
+pub mod commands;
 mod cpu;
-mod debugger;
 mod display;
 pub mod gui;
 pub mod hex;
@@ -41,15 +44,44 @@ impl Emulator {
         }
 
         for _ in 0..1_000 {
-            // todo: detect BRK / breakpoint / halt
-            if false || self.breakpoints.contains(&0_0_0) {
-                // todo: print cpu info + a message describing the cause of halt
+            if self.cpu.next_instr(&mut self.mem).0 == Instr::Brk {
+                eprintln!("\n\n>>> would break");
                 self.halted = true;
-                return;
+                break;
+            }
+            if self.cpu.would_halt(&mut self.mem) {
+                eprintln!("\n\n>>> would halt");
+                self.halted = true;
+                break;
+            }
+            if self.breakpoints.contains(&self.cpu.pc) {
+                eprintln!("\n\n>>> breakpoint");
+                self.halted = true;
+                break;
             }
 
             self.cpu.step(&mut self.mem);
             self.num_instructions_executed += 1;
+
+            // Detect long-running loops that aren't a simple "halt
+            // instruction".
+            let i = self.num_instructions_executed;
+            let thresh = 100_000_000;
+            if i != 0 && i % thresh == 0 {
+                let m = 1_000_000;
+                eprintln!("\n\n>>> after {}M instructions,", i / m);
+                eprintln!(">>> {:?}\n", self.cpu);
+                eprint!("... ");
+            }
+        }
+
+        if self.halted {
+            let cpu_info = self.cpu.dbg(&mut self.mem).to_string();
+            for line in cpu_info.lines() {
+                eprintln!(">>> {line}");
+            }
+            eprintln!();
+            eprint!("... ");
         }
     }
 
@@ -79,27 +111,60 @@ impl Emulator {
     }
 
     pub fn all_keys_up(&mut self) {
-        unimplemented!();
+        todo!("clear any-key-down flag");
+        // TODO: also make sure we're actually setting said flag in mem.key_down !
     }
 
-    pub fn control(&mut self, _cmd: Command) {
-        unimplemented!();
+    /// Execute a "debugger" command.
+    pub fn control(&mut self, cmd: Command) {
+        match cmd {
+            Command::Halt => {
+                if self.halted {
+                    println!("already halted");
+                } else {
+                    self.halted = true;
+                    println!("{}\n", self.cpu.dbg(&mut self.mem));
+                }
+            }
+            Command::Continue => {
+                if !self.halted {
+                    println!("already running");
+                } else {
+                    self.halted = false;
+                }
+            }
+            Command::Step => {
+                if !self.halted {
+                    println!("halting");
+                    self.halted = true;
+                }
+                self.cpu.step(&mut self.mem);
+                self.num_instructions_executed += 1;
 
-        // let mut should_halt = true;
-        // match cmd {
-        //     Command::Halt => (),
-        //     Command::Continue => should_halt = false,
-        //     Command::Step => {
-        //         cpu.step(&mut *mem.lock().unwrap());
-        //         self.num_instructions_executed += 1;
-        //     }
-        // }
-        // halt.store(should_halt, Relaxed);
-        // // todo: this synchronization feels kinda messy.
-        // // Couldn't we just have a bunch of global state wrapped up in a single lock?
-
-        // if should_halt {
-        //     eprintln!("{:?}", cpu.cpu);
-        // }
+                println!("{}\n", self.cpu.dbg(&mut self.mem));
+            }
+            Command::ToggleBreakpoint { addr } => {
+                if let Some((idx, _)) = self.breakpoints.iter().find_position(|&&a| a == addr) {
+                    self.breakpoints.swap_remove(idx);
+                    println!("cleared breakpoint ${:04x}", addr);
+                } else {
+                    self.breakpoints.push(addr);
+                    println!("set breakpoint ${:04x}", addr);
+                }
+            }
+            Command::ShowByte { addr } => {
+                println!("ram[${:04x}]: ${:02x}\n", addr, self.mem.get(addr));
+            }
+            Command::ShowRange {
+                start,
+                end_inclusive,
+            } => {
+                println!("ram[${:04x}..=${:04x}]:", start, end_inclusive);
+                for addr in start..=end_inclusive {
+                    print!("{:02x} ", self.mem.get(addr));
+                }
+                println!("\n");
+            }
+        }
     }
 }
