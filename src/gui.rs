@@ -14,7 +14,7 @@ use itertools::Itertools;
 use softbuffer::{Context, SoftBufferError, Surface};
 use winit::{
     application::ApplicationHandler,
-    dpi::PhysicalSize,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::{ElementState, KeyEvent, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop, EventLoopClosed, OwnedDisplayHandle},
     keyboard::{Key, NamedKey},
@@ -89,6 +89,15 @@ impl Gui {
             .with_max_inner_size(DESIRED_WINDOW_SIZE)
             .with_resizable(false);
         let window = Rc::new(event_loop.create_window(attrs)?);
+
+        // Temporary hack, while debugging...
+        if event_loop.available_monitors().count() >= 2 {
+            window.set_outer_position(PhysicalPosition {
+                x: 1920 + 100,
+                y: 100,
+            });
+        }
+
         self.window = Some(Rc::clone(&window));
 
         let context = Context::new(event_loop.owned_display_handle())?;
