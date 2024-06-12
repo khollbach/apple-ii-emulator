@@ -13,12 +13,12 @@ use crate::memory::Memory;
 
 #[derive(Clone)]
 pub struct Cpu {
-    pub pc: u16,
-    pub sp: u8,
-    pub flags: Flags,
-    pub a: u8,
-    pub x: u8,
-    pub y: u8,
+    pc: u16,
+    sp: u8,
+    flags: Flags,
+    a: u8,
+    x: u8,
+    y: u8,
 }
 
 impl Cpu {
@@ -31,6 +31,10 @@ impl Cpu {
             x: 0,
             y: 0,
         }
+    }
+
+    pub fn pc(&self) -> u16 {
+        self.pc
     }
 
     pub fn next_instr(&self, mem: &mut Memory) -> (Instr, Mode, Operand) {
@@ -273,7 +277,7 @@ impl fmt::Debug for Cpu {
 }
 
 impl Cpu {
-    pub fn dbg(&self, mem: &mut Memory) -> CpuDbg {
+    pub fn dbg_next_instr(&self, mem: &mut Memory) -> DbgNextInstr {
         let next_instr = self.next_instr(mem);
 
         let mut next_instr_bytes = vec![];
@@ -282,7 +286,7 @@ impl Cpu {
             next_instr_bytes.push(byte);
         }
 
-        CpuDbg {
+        DbgNextInstr {
             cpu: self.clone(),
             next_instr,
             next_instr_bytes,
@@ -290,20 +294,30 @@ impl Cpu {
     }
 }
 
-pub struct CpuDbg {
+pub struct DbgNextInstr {
     cpu: Cpu,
     next_instr: (Instr, Mode, Operand),
     next_instr_bytes: Vec<u8>,
 }
 
-impl fmt::Display for CpuDbg {
+impl fmt::Display for DbgNextInstr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:?}", self.cpu)?;
-        write!(
-            f,
-            "next instr: {:02x?} {:?}",
-            self.next_instr_bytes, self.next_instr
-        )?;
+        write!(f, "{:04x}:", self.cpu.pc)?;
+
+        for i in 0..3 {
+            if i < self.next_instr_bytes.len() {
+                let b = self.next_instr_bytes[i];
+                write!(f, " {:02x}", b)?;
+            } else {
+                write!(f, "   ")?;
+            }
+        }
+
+        write!(f, "{}", " ".repeat(5))?;
+
+        let (instr, mode, arg) = self.next_instr;
+        write!(f, "{:?}  {:10}  {:?}", instr, format!("{:?}", mode), arg)?;
+        // todo: surely there's a better way to get spacing right, but cba for now
 
         Ok(())
     }

@@ -21,6 +21,13 @@ pub struct Emulator {
     halted: bool,
     num_instructions_executed: u64,
     breakpoints: Vec<u16>,
+    /// If a `finish` command is ongoing, this stores the current subroutine
+    /// depth, e.g.:
+    /// * 0 if we haven't called any inner subroutines
+    /// * 3 if we're 3 subroutines deep
+    /// And when it would go negative, we know we've returned from the top-level
+    /// subroutine.
+    finish_state: Option<usize>,
 }
 
 impl Emulator {
@@ -34,55 +41,72 @@ impl Emulator {
             halted: false,
             num_instructions_executed: 0,
             breakpoints,
+            finish_state: None,
         }
     }
 
     /// Called at ~300 Hz.
     pub fn sim_1000_instrs(&mut self) {
+        for _ in 0..1_000 {
+            self.step();
+        }
+    }
+
+    fn step(&mut self) {
         if self.halted {
             return;
         }
 
-        for _ in 0..1_000 {
-            if self.cpu.next_instr(&mut self.mem).0 == Instr::Brk {
-                eprintln!("\n\n>>> would break");
-                self.halted = true;
-                break;
-            }
-            if self.cpu.would_halt(&mut self.mem) {
-                eprintln!("\n\n>>> would halt");
-                self.halted = true;
-                break;
-            }
-            if self.breakpoints.contains(&self.cpu.pc) {
-                eprintln!("\n\n>>> breakpoint");
-                self.halted = true;
-                break;
-            }
+        if self.check_breakpoints().is_break() {
+            self.halted = true;
 
-            self.cpu.step(&mut self.mem);
-            self.num_instructions_executed += 1;
-
-            // Detect long-running loops that aren't a simple "halt
-            // instruction".
-            let i = self.num_instructions_executed;
-            let thresh = 100_000_000;
-            if i != 0 && i % thresh == 0 {
-                let m = 1_000_000;
-                eprintln!("\n\n>>> after {}M instructions,", i / m);
-                eprintln!(">>> {:?}\n", self.cpu);
-                eprint!("... ");
-            }
-        }
-
-        if self.halted {
-            let cpu_info = self.cpu.dbg(&mut self.mem).to_string();
-            for line in cpu_info.lines() {
-                eprintln!(">>> {line}");
-            }
-            eprintln!();
+            eprintln!("{}", self.cpu.dbg_next_instr(&mut self.mem));
             eprint!("... ");
+
+            return;
         }
+
+        self.cpu.step(&mut self.mem);
+        self.num_instructions_executed += 1;
+    }
+
+    fn check_breakpoints(&mut self) -> ControlFlow<()> {
+        if self.cpu.next_instr(&mut self.mem).0 == Instr::Brk {
+            eprintln!("\nwould break");
+            return ControlFlow::Break(());
+        }
+
+        if self.cpu.would_halt(&mut self.mem) {
+            eprintln!("\nwould halt");
+            return ControlFlow::Break(());
+        }
+
+        if self.breakpoints.contains(&self.cpu.pc()) {
+            eprintln!("\nhit breakpoint");
+            return ControlFlow::Break(());
+        }
+
+        if let Some(depth) = self.finish_state.as_mut() {
+            let next_instr = self.cpu.next_instr(&mut self.mem);
+            match next_instr.0 {
+                Instr::Jsr => *depth += 1,
+                Instr::Rts => {
+                    if *depth == 0 {
+                        self.cpu.step(&mut self.mem);
+                        self.num_instructions_executed += 1;
+
+                        eprintln!("\nfinished subroutine");
+                        self.finish_state = None;
+                        return ControlFlow::Break(());
+                    } else {
+                        *depth -= 1;
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        ControlFlow::Continue(())
     }
 
     /// Called at 60 Hz.
@@ -102,8 +126,9 @@ impl Emulator {
         let _ = gr::dots(self.mem.gr_page1());
         let _ = hgr::dots_color(self.mem.hgr_page1());
         let _ = hgr::dots_bw(self.mem.hgr_page1());
+        let _ = text::dots(self.mem.gr_page1());
 
-        text::dots(self.mem.gr_page1())
+        gr::dots(self.mem.gr_page1())
     }
 
     pub fn key_down(&mut self, ascii_code: u8) {
@@ -117,54 +142,6 @@ impl Emulator {
 
     /// Execute a "debugger" command.
     pub fn control(&mut self, cmd: Command) {
-        match cmd {
-            Command::Halt => {
-                if self.halted {
-                    println!("already halted");
-                } else {
-                    self.halted = true;
-                    println!("{}\n", self.cpu.dbg(&mut self.mem));
-                }
-            }
-            Command::Continue => {
-                if !self.halted {
-                    println!("already running");
-                } else {
-                    self.halted = false;
-                }
-            }
-            Command::Step => {
-                if !self.halted {
-                    println!("halting");
-                    self.halted = true;
-                }
-                self.cpu.step(&mut self.mem);
-                self.num_instructions_executed += 1;
-
-                println!("{}\n", self.cpu.dbg(&mut self.mem));
-            }
-            Command::ToggleBreakpoint { addr } => {
-                if let Some((idx, _)) = self.breakpoints.iter().find_position(|&&a| a == addr) {
-                    self.breakpoints.swap_remove(idx);
-                    println!("cleared breakpoint ${:04x}", addr);
-                } else {
-                    self.breakpoints.push(addr);
-                    println!("set breakpoint ${:04x}", addr);
-                }
-            }
-            Command::ShowByte { addr } => {
-                println!("ram[${:04x}]: ${:02x}\n", addr, self.mem.get(addr));
-            }
-            Command::ShowRange {
-                start,
-                end_inclusive,
-            } => {
-                println!("ram[${:04x}..=${:04x}]:", start, end_inclusive);
-                for addr in start..=end_inclusive {
-                    print!("{:02x} ", self.mem.get(addr));
-                }
-                println!("\n");
-            }
-        }
+        cmd.execute(self);
     }
 }

@@ -1,10 +1,12 @@
+use std::fmt;
+
 use crate::{
     cpu::{instr::Mode, Cpu},
     memory::Memory,
 };
 
 /// This abstracts away the details of addressing modes.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum Operand {
     Memory { addr: u16 },
     Literal { value: u8 },
@@ -98,4 +100,37 @@ fn checked_offset(addr: u16, offset: i8) -> Option<u16> {
 
     let abs_offset = (offset as i16).abs() as u16;
     addr.checked_sub(abs_offset)
+}
+
+impl fmt::Debug for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::Memory { addr } => f
+                .debug_struct("Memory")
+                .field("addr", &AddrDbg(addr))
+                .finish(),
+            Self::Literal { value } => f
+                .debug_struct("Literal")
+                .field("value", &ValueDbg(value))
+                .finish(),
+            Self::Accumulator => write!(f, "Accumulator"),
+            Self::None => write!(f, "None"),
+        }
+    }
+}
+
+struct AddrDbg(u16);
+
+impl fmt::Debug for AddrDbg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "${:04x}", self.0)
+    }
+}
+
+struct ValueDbg(u8);
+
+impl fmt::Debug for ValueDbg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "${:02x}", self.0)
+    }
 }
