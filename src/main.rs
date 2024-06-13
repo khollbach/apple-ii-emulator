@@ -27,11 +27,11 @@ struct Args {
     program: String,
 
     /// Memory address to load the program at.
-    #[arg(long, default_value = "$6000")]
+    #[arg(long)]
     load_addr: String,
 
     /// Memory address of the first instruction to execute.
-    #[arg(long, default_value = "$6000")]
+    #[arg(long)]
     start_addr: String,
 
     /// Memory address to set a breakpoint in the debugger. Can be passed

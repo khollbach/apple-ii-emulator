@@ -27,6 +27,9 @@ pub struct Emulator {
     /// * 3 if we're 3 subroutines deep
     /// And when it would go negative, we know we've returned from the top-level
     /// subroutine.
+    ///
+    /// NB: the Apple IIe 80col ROM uses hacks and tricks (like RTS without a
+    /// JSR), so this will sometimes halt earlier than you expect.
     finish_state: Option<usize>,
 }
 
@@ -128,7 +131,10 @@ impl Emulator {
         let _ = hgr::dots_bw(self.mem.hgr_page1());
         let _ = text::dots(self.mem.gr_page1());
 
+        // text::dots(self.mem.gr_page1())
         gr::dots(self.mem.gr_page1())
+        // hgr::dots_bw(self.mem.hgr_page1())
+        // hgr::dots_color(self.mem.hgr_page1())
     }
 
     pub fn key_down(&mut self, ascii_code: u8) {
@@ -136,8 +142,7 @@ impl Emulator {
     }
 
     pub fn all_keys_up(&mut self) {
-        todo!("clear any-key-down flag");
-        // TODO: also make sure we're actually setting said flag in mem.key_down !
+        self.mem.all_keys_up();
     }
 
     /// Execute a "debugger" command.

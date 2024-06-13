@@ -84,6 +84,13 @@ impl Command {
                     println!("already running");
                 } else {
                     emu.halted = false;
+
+                    // Skip past the current breakpoint. (Instead of breaking
+                    // right away and going nowhere.)
+                    if emu.breakpoints.contains(&emu.cpu.pc()) {
+                        emu.cpu.step(&mut emu.mem);
+                        emu.num_instructions_executed += 1;
+                    }
                 }
             }
             Command::CpuInfo => {
@@ -148,7 +155,11 @@ fn show_range(mem: &mut Memory, start: u16, end_inclusive: u16) {
                 _ => print!(" "),
             }
 
-            // Extra blank line between pages of memory.
+            // Blank line at half-page mark.
+            if addr % 256 == 128 {
+                println!();
+            }
+            // Second blank line between pages.
             if addr % 256 == 0 {
                 println!();
             }

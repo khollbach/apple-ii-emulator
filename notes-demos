@@ -1,0 +1,44 @@
+list of demos, with any features that we've noticed are missing, to make them run
+
+logos
+    PAGE2_OFF equ $c054
+    PAGE2_ON equ $c055
+  (bonus:)
+    TEXT_OFF equ $c050
+    TEXT_ON equ $c051
+    HIRES_OFF equ $c056
+    HIRES_ON equ $c057
+  (double-bonus:)
+    MIXED_OFF equ $c052
+    MIXED_ON equ $c053
+
+tunnel (seems to work fine)
+
+colors (looks good)
+
+chess (looks gooood)
+
+ascii (looks fine)
+  (bonus:)
+    impl display of extra glyphs: (see github gif)
+    * blinking
+    * inverse
+    * extra copy of upper alpha
+
+reverse
+    * After preventing stores to c000 from modifying its value,
+      these issues appear to be fixed:
+        * getting an extra '>' prompt char
+        * once you've scrolled off the bottom, the prompt starts auto-repeating
+
+---
+
+guess-the-number (seems to work)
+
+ghosts (seems good!)
+
+sokoban (yes!)
+
+snake
+    * mixed mode (we can't read the instructions printed at the bottom)
+

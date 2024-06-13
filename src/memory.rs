@@ -23,6 +23,17 @@ impl Memory {
     }
 
     pub fn set(&mut self, addr: u16, value: u8) {
+        // TODO:
+        // * ok, next big todo is figure out a more sustainable way to
+        //   mock out memory-mapped IO.
+        // * I'm thinking we just crash when an un-impl'd address gets touched.
+        //   That way we can incrementally impl them as needed.
+
+        // todo: generalize
+        if addr == 0xc000 {
+            return;
+        }
+
         self.trigger_soft_switches(addr);
         self.ram[addr as usize] = value;
     }
@@ -37,7 +48,12 @@ impl Memory {
 
     pub fn key_down(&mut self, ascii_code: u8) {
         assert!(ascii_code < 0x80);
-        self.ram[0xc000] = ascii_code | 0x80;
+        self.ram[0xc000] = ascii_code | 0x80; // set strobe bit
+        self.ram[0xc010] |= 0x80; // set any key down
+    }
+
+    pub fn all_keys_up(&mut self) {
+        self.ram[0xc010] &= 0x7f; // clear any key down
     }
 
     fn trigger_soft_switches(&mut self, addr: u16) {

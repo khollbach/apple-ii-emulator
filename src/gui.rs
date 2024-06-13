@@ -151,10 +151,6 @@ impl Gui {
     }
 
     fn key_event(&self, e: KeyEvent) {
-        if !e.state.is_pressed() {
-            return;
-        }
-
         // This mapping probably isn't 100% accurate, and we aren't handling
         // modifiers very carefully. See the table on page 13 of the //e
         // Technical Reference Manual for more ideas.
@@ -178,11 +174,13 @@ impl Gui {
             _ => return,
         };
 
-        // todo: generate all_key_up events as well
-        // * if we call it whenever *any* key we care about gets released, it'll
-        // probably feel "good enough" for now.
-
-        self.emu.lock().unwrap().key_down(ascii_code);
+        if e.state.is_pressed() {
+            self.emu.lock().unwrap().key_down(ascii_code);
+        } else {
+            // todo: this is technically not a correct implementation, but I'm
+            // guessing it'll feel "good enough", for now.
+            self.emu.lock().unwrap().all_keys_up();
+        }
     }
 
     fn redraw(&mut self) -> StdResult<(), SoftBufferError> {
