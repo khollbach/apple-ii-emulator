@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{
     cpu::{instr::Mode, Cpu},
-    memory::Memory,
+    memory::AddressSpace,
 };
 
 /// This abstracts away the details of addressing modes.
@@ -15,12 +15,12 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn new(cpu: &Cpu, mem: &mut Memory, mode: Mode) -> Self {
+    pub fn new(cpu: &Cpu, mem: &mut AddressSpace, mode: Mode) -> Self {
         let arg_len = mode.instr_len() - 1;
         let arg: u16 = match arg_len {
             0 => 0,
             1 => mem.get(cpu.pc.checked_add(1).unwrap()).into(),
-            2 => mem.get_word(cpu.pc.checked_add(1).unwrap()),
+            2 => get_word(mem, cpu.pc.checked_add(1).unwrap()),
             _ => unreachable!(),
         };
 
@@ -56,18 +56,18 @@ impl Operand {
             },
 
             Mode::Indirect => Self::Memory {
-                addr: mem.get_word(arg),
+                addr: get_word(mem, arg),
             },
             Mode::XIndirect => Self::Memory {
-                addr: mem.get_word((arg as u8).wrapping_add(cpu.x) as u16),
+                addr: get_word(mem, (arg as u8).wrapping_add(cpu.x) as u16),
             },
             Mode::IndirectY => Self::Memory {
-                addr: mem.get_word(arg).checked_add(cpu.y as u16).unwrap(),
+                addr: get_word(mem, arg).checked_add(cpu.y as u16).unwrap(),
             },
         }
     }
 
-    pub fn get(self, cpu: &Cpu, mem: &mut Memory) -> u8 {
+    pub fn get(self, cpu: &Cpu, mem: &mut AddressSpace) -> u8 {
         match self {
             Self::Memory { addr } => mem.get(addr),
             Self::Literal { value } => value,
@@ -76,7 +76,7 @@ impl Operand {
         }
     }
 
-    pub fn set(self, cpu: &mut Cpu, mem: &mut Memory, value: u8) {
+    pub fn set(self, cpu: &mut Cpu, mem: &mut AddressSpace, value: u8) {
         match self {
             Self::Memory { addr } => mem.set(addr, value),
             Self::Literal { .. } => panic!("cannot mutate literal value {self:?}"),
@@ -91,6 +91,12 @@ impl Operand {
             _ => panic!("operand doesn't have a memory address: {self:?}"),
         }
     }
+}
+
+fn get_word(mem: &mut AddressSpace, addr: u16) -> u16 {
+    let lo = mem.get(addr);
+    let hi = mem.get(addr.checked_add(1).unwrap());
+    u16::from_le_bytes([lo, hi])
 }
 
 fn checked_offset(addr: u16, offset: i8) -> Option<u16> {

@@ -1,65 +1,32 @@
-mod load_program;
+mod io;
+mod rom;
+
+use std::mem;
+
+use io::Io;
+use rom::Rom;
+
+use crate::display::{color::Color, gr, hgr, text};
 
 /// Everything in the memory address space (including RAM, ROM, and I/O).
-#[derive(Clone)]
-pub struct Memory {
-    ram: Vec<u8>,
+pub struct AddressSpace {
+    /// $0000..$c000
+    main_ram: Box<[u8; 0xc000]>,
+    /// $c000..$d000
+    io: Io,
+    /// $d000..=$ffff
+    rom: Rom,
 }
 
-impl Memory {
+impl AddressSpace {
     pub fn new(program: &[u8], load_addr: u16) -> Self {
-        load_program::load_program(program, load_addr)
-    }
+        let mut main_ram = Box::new([0u8; 0xc000]);
+        main_ram[load_addr as usize..][..program.len()].copy_from_slice(program);
 
-    pub fn get(&mut self, addr: u16) -> u8 {
-        self.trigger_soft_switches(addr);
-        self.ram[addr as usize]
-    }
-
-    pub fn get_word(&mut self, addr: u16) -> u16 {
-        let lo = self.get(addr);
-        let hi = self.get(addr.checked_add(1).unwrap());
-        u16::from_le_bytes([lo, hi])
-    }
-
-    pub fn set(&mut self, addr: u16, value: u8) {
-        // TODO:
-        // * ok, next big todo is figure out a more sustainable way to
-        //   mock out memory-mapped IO.
-        // * I'm thinking we just crash when an un-impl'd address gets touched.
-        //   That way we can incrementally impl them as needed.
-
-        // todo: generalize
-        if addr == 0xc000 {
-            return;
-        }
-
-        self.trigger_soft_switches(addr);
-        self.ram[addr as usize] = value;
-    }
-
-    pub fn gr_page1(&self) -> &[u8] {
-        &self.ram[0x400..0x800]
-    }
-
-    pub fn hgr_page1(&self) -> &[u8] {
-        &self.ram[0x2000..0x4000]
-    }
-
-    pub fn key_down(&mut self, ascii_code: u8) {
-        assert!(ascii_code < 0x80);
-        self.ram[0xc000] = ascii_code | 0x80; // set strobe bit
-        self.ram[0xc010] |= 0x80; // set any key down
-    }
-
-    pub fn all_keys_up(&mut self) {
-        self.ram[0xc010] &= 0x7f; // clear any key down
-    }
-
-    fn trigger_soft_switches(&mut self, addr: u16) {
-        if addr == 0xc010 {
-            // Clear keyboard strobe.
-            self.ram[0xc000] &= 0x7f;
+        Self {
+            main_ram,
+            io: Io::new(),
+            rom: Rom::new(),
         }
     }
 
@@ -67,14 +34,67 @@ impl Memory {
     /// This sets up required state for keyboard input routines, etc.
     /// Once we figure out how interrupts work, we can re-visit this.
     pub fn set_softev(&mut self, start_addr: u16) -> u16 {
-        assert_eq!(self.ram[0x03f2..][..3], [0, 0, 0]);
+        assert_eq!(self.main_ram[0x03f2..][..3], [0, 0, 0]);
 
         let [lo, hi] = start_addr.to_le_bytes();
-        self.ram[0x03f2] = lo;
-        self.ram[0x03f3] = hi;
-        self.ram[0x03f4] = 0xa5 ^ self.ram[0x03f3]; // magic number to indicate "warm start"
+        self.main_ram[0x03f2] = lo;
+        self.main_ram[0x03f3] = hi;
+        self.main_ram[0x03f4] = 0xa5 ^ self.main_ram[0x03f3]; // magic number to indicate "warm start"
 
         let pc = 0xfa62; // RESET
         pc
+    }
+
+    pub fn get(&mut self, addr: u16) -> u8 {
+        match addr {
+            0x0000..=0xbfff => self.main_ram[addr as usize],
+            0xc000..=0xcfff => self.io.get(addr),
+            0xd000..=0xffff => self.rom.get(addr),
+        }
+    }
+
+    pub fn set(&mut self, addr: u16, value: u8) {
+        match addr {
+            0x0000..=0xbfff => self.main_ram[addr as usize] = value,
+            0xc000..=0xcfff => self.io.set(addr, value),
+            0xd000..=0xffff => self.rom.set(addr, value),
+        }
+    }
+
+    pub fn display(&self) -> Vec<Vec<Color>> {
+        let page = match (self.io.hires, self.io.page2) {
+            (false, false) => &self.main_ram[0x400..0x800],
+            (false, true) => &self.main_ram[0x800..0xc00],
+            (true, false) => &self.main_ram[0x2000..0x4000],
+            (true, true) => &self.main_ram[0x4000..0x6000],
+        };
+
+        if self.io.text {
+            return text::dots(page);
+        }
+
+        let mut dots = if self.io.hires {
+            hgr::dots_bw(page); // swap these if you want B&W display
+            hgr::dots_color(page)
+        } else {
+            gr::dots(page)
+        };
+
+        if self.io.mixed {
+            let mut text_dots = text::dots(page);
+            for y in 20 * text::CELL_H..24 * text::CELL_H {
+                dots[y] = mem::take(&mut text_dots[y]);
+            }
+        }
+
+        dots
+    }
+
+    pub fn key_down(&mut self, ascii_code: u8) {
+        self.io.key_down(ascii_code);
+    }
+
+    pub fn all_keys_up(&mut self) {
+        self.io.all_keys_up();
     }
 }

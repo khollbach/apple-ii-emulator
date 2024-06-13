@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::{bail, ensure, Context, Result};
 use itertools::Itertools;
 
-use crate::{hex, memory::Memory, Emulator};
+use crate::{hex, memory::AddressSpace, Emulator};
 
 /// CLI debugger command.
 #[derive(Debug, Clone, Copy)]
@@ -144,7 +144,7 @@ impl Command {
     }
 }
 
-fn show_range(mem: &mut Memory, start: u16, end_inclusive: u16) {
+fn show_range(mem: &mut AddressSpace, start: u16, end_inclusive: u16) {
     let start_rounded_down = start / 16 * 16;
 
     for addr in start_rounded_down..=end_inclusive {

@@ -13,7 +13,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use apple_ii_emulator::{commands::Command, gui::Gui, hex, Emulator};
+use apple_ii_emulator::{debugger_commands::Command, gui::Gui, hex, Emulator};
 use clap::{command, Parser};
 use itertools::Itertools;
 use winit::event_loop::{EventLoop, EventLoopClosed};

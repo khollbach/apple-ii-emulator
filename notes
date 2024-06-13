@@ -12,14 +12,11 @@ future:
 
 ---
 
+more soft switches:
+* bank switching
+* then do a refactor of the soft switch code
+
 hardware features:
-
-* meta: design mem-mapped-io code structure
-
-* soft-switching b/w display modes
-* mixed mode
-* page2
-
 * inverse text glyphs
 * blinking glyphs
 

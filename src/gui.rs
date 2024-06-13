@@ -24,7 +24,7 @@ use winit::{
 use crate::{
     cpu::Cpu,
     display::{color::Color, gr, hgr, text},
-    memory::Memory,
+    memory::AddressSpace,
     Emulator,
 };
 

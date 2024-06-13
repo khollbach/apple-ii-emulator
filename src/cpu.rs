@@ -9,7 +9,7 @@ use flags::{Flag, Flags};
 use instr::{Instr, Mode};
 use operand::Operand;
 
-use crate::memory::Memory;
+use crate::memory::AddressSpace;
 
 #[derive(Clone)]
 pub struct Cpu {
@@ -37,13 +37,13 @@ impl Cpu {
         self.pc
     }
 
-    pub fn next_instr(&self, mem: &mut Memory) -> (Instr, Mode, Operand) {
+    pub fn next_instr(&self, mem: &mut AddressSpace) -> (Instr, Mode, Operand) {
         let (instr, mode) = instr::decode(mem.get(self.pc));
         let arg = Operand::new(self, mem, mode);
         (instr, mode, arg)
     }
 
-    pub fn step(&mut self, mem: &mut Memory) {
+    pub fn step(&mut self, mem: &mut AddressSpace) {
         let (instr, mode, arg) = self.next_instr(mem);
 
         let mut pc_set = false;
@@ -227,17 +227,17 @@ pub fn would_branch(branch: Instr, flags: Flags) -> bool {
 
 /// Stack operations.
 impl Cpu {
-    fn push(&mut self, mem: &mut Memory, value: u8) {
+    fn push(&mut self, mem: &mut AddressSpace, value: u8) {
         mem.set(0x0100 + self.sp as u16, value);
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    fn pop(&mut self, mem: &mut Memory) -> u8 {
+    fn pop(&mut self, mem: &mut AddressSpace) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         mem.get(0x0100 + self.sp as u16)
     }
 
-    fn push2(&mut self, mem: &mut Memory, word: u16) {
+    fn push2(&mut self, mem: &mut AddressSpace, word: u16) {
         let [lo, hi] = u16::to_le_bytes(word);
 
         // The stack grows down, so this stores the bytes in little-endian
@@ -246,7 +246,7 @@ impl Cpu {
         self.push(mem, lo);
     }
 
-    fn pop2(&mut self, mem: &mut Memory) -> u16 {
+    fn pop2(&mut self, mem: &mut AddressSpace) -> u16 {
         let lo = self.pop(mem);
         let hi = self.pop(mem);
         u16::from_le_bytes([lo, hi])
@@ -255,7 +255,7 @@ impl Cpu {
 
 impl Cpu {
     /// Detect a "halt" instruction.
-    pub fn would_halt(&self, mem: &mut Memory) -> bool {
+    pub fn would_halt(&self, mem: &mut AddressSpace) -> bool {
         let (instr, mode, arg) = self.next_instr(mem);
         let abs_jmp = instr == Instr::Jmp && mode == Mode::Absolute;
         let active_branch = mode == Mode::Relative && would_branch(instr, self.flags);
@@ -277,7 +277,7 @@ impl fmt::Debug for Cpu {
 }
 
 impl Cpu {
-    pub fn dbg_next_instr(&self, mem: &mut Memory) -> DbgNextInstr {
+    pub fn dbg_next_instr(&self, mem: &mut AddressSpace) -> DbgNextInstr {
         let next_instr = self.next_instr(mem);
 
         let mut next_instr_bytes = vec![];

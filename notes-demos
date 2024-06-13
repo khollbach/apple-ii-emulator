@@ -1,16 +1,12 @@
 list of demos, with any features that we've noticed are missing, to make them run
 
 logos
-    PAGE2_OFF equ $c054
-    PAGE2_ON equ $c055
-  (bonus:)
-    TEXT_OFF equ $c050
-    TEXT_ON equ $c051
-    HIRES_OFF equ $c056
-    HIRES_ON equ $c057
-  (double-bonus:)
-    MIXED_OFF equ $c052
-    MIXED_ON equ $c053
+  x PAGE2_OFF equ $c054
+  x PAGE2_ON equ $c055
+  x TEXT_OFF equ $c050
+  x TEXT_ON equ $c051
+  x HIRES_OFF equ $c056
+  x HIRES_ON equ $c057
 
 tunnel (seems to work fine)
 
@@ -41,4 +37,6 @@ sokoban (yes!)
 
 snake
     * mixed mode (we can't read the instructions printed at the bottom)
+    MIXED_OFF equ $c052
+    MIXED_ON equ $c053
 

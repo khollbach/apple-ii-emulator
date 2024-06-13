@@ -2,14 +2,14 @@
 
 use std::ops::ControlFlow;
 
-use commands::Command;
 use cpu::{instr::Instr, Cpu};
+use debugger_commands::Command;
 use display::{color::Color, gr, hgr, text};
 use itertools::Itertools;
-use memory::Memory;
+use memory::AddressSpace;
 
-pub mod commands;
 mod cpu;
+pub mod debugger_commands;
 mod display;
 pub mod gui;
 pub mod hex;
@@ -17,7 +17,7 @@ mod memory;
 
 pub struct Emulator {
     cpu: Cpu,
-    mem: Memory,
+    mem: AddressSpace,
     halted: bool,
     num_instructions_executed: u64,
     breakpoints: Vec<u16>,
@@ -35,7 +35,7 @@ pub struct Emulator {
 
 impl Emulator {
     pub fn new(program: &[u8], load_addr: u16, start_addr: u16, breakpoints: Vec<u16>) -> Self {
-        let mut mem = Memory::new(&program, load_addr);
+        let mut mem = AddressSpace::new(&program, load_addr);
         let pc = mem.set_softev(start_addr);
 
         Self {
@@ -114,20 +114,7 @@ impl Emulator {
 
     /// Called at 60 Hz.
     pub fn draw_screen(&self) -> Vec<Vec<Color>> {
-        // todo:
-        // * impl soft switches for toggling b/w (fullscreen) display modes
-        // * (mixed mode is much lower prio)
-
-        // ignore unused code
-        let _ = gr::dots(self.mem.gr_page1());
-        let _ = hgr::dots_color(self.mem.hgr_page1());
-        let _ = hgr::dots_bw(self.mem.hgr_page1());
-        let _ = text::dots(self.mem.gr_page1());
-
-        // text::dots(self.mem.gr_page1())
-        gr::dots(self.mem.gr_page1())
-        // hgr::dots_bw(self.mem.hgr_page1())
-        // hgr::dots_color(self.mem.hgr_page1())
+        self.mem.display()
     }
 
     pub fn key_down(&mut self, ascii_code: u8) {
