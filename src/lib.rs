@@ -113,14 +113,7 @@ impl Emulator {
     }
 
     /// Called at 60 Hz.
-    //
-    // todo:
-    // * change output type to [[Color; 280]; 192] ?
-    // * make output to &mut param ?
     pub fn draw_screen(&self) -> Vec<Vec<Color>> {
-        // TODO at some point:
-        // * maybe render all 3 screens, for easier debugging ?
-
         // todo:
         // * impl soft switches for toggling b/w (fullscreen) display modes
         // * (mixed mode is much lower prio)

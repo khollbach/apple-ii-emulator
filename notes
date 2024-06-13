@@ -1,30 +1,25 @@
-next steps:
-* maybe hand-write a trivial "echo" program to test keyboard / screen
-    > the goal is to be simpler than BASIC and sysmon, and thus easier
-      to debug
+note:
+* the behaviour we'll use as a "source of truth" is that of an unenhanced Apple IIe, with a revision B mainboard, and an extended 80 column text card
+
+---
+
+future:
+* debug the BASIC crash?
 * another possible angle could be to debug individual monitor IO routines,
   one at a time, and check that they have the intended behaviour.
-    * this seems more tractable than just single-stepping the sysmon code
     * see the TRM, page ~62 for ROM routine docs
-* or maybe we just debug the BASIC crash? I mean, how hard can it be...
+* or, get Rust toolchain up&running, and write some small demos/games
 
 ---
 
-first:
-/ move gui to main
+hardware features:
 
-interlude: implement a more useful debugger
-/ start by just impl'ing "halt", as a "hello world"
-* then think about how to structure the code
-    * e.g.: 1. parse command; 2. execute command
-* write down the steps, in order, you'll do to impl the MVP
-    (h, c, b, s)
+* meta: design mem-mapped-io code structure
 
----
+* soft-switching b/w display modes
+* mixed mode
+* page2
 
-then:
-* make a list of hardware features to-do, + order them in terms of what you
-  want to impl first, + maybe try some with (tiny) "demo" ideas
-    (* could think about getting Rust toolchain up&running to make writing
-      demos more fun..)
+* inverse text glyphs
+* blinking glyphs
 

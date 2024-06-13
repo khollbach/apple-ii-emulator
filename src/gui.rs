@@ -33,7 +33,7 @@ use crate::{
 const SCALE: usize = 2;
 
 const DESIRED_WINDOW_SIZE: PhysicalSize<u32> =
-    PhysicalSize::new(hgr::W as u32 * SCALE as u32, hgr::H as u32 * SCALE as u32);
+    PhysicalSize::new((hgr::W * SCALE) as u32, (hgr::H * SCALE) as u32);
 
 type StdResult<T, E> = std::result::Result<T, E>;
 
@@ -184,13 +184,6 @@ impl Gui {
     }
 
     fn redraw(&mut self) -> StdResult<(), SoftBufferError> {
-        // todo: maybe this is holding the lock for too long?
-        // * could be interesting to investigate, at some point
-        // * if it *was* an issue, one simple fix would be
-        //      1. claim the lock
-        //      2. copy out just the slice of memory we care about
-        //      3. release the lock
-        //      4. then do the conversion from bytes to dots
         let dots = self.emu.lock().unwrap().draw_screen();
 
         let surface = self.surface.as_mut().unwrap();
