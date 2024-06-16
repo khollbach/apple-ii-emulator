@@ -13,8 +13,9 @@ future:
 ---
 
 more soft switches:
-* bank switching
-* then do a refactor of the soft switch code
+/ first do a refactor of the soft switch code
+/ test it
+* then impl bank switching
 
 hardware features:
 * inverse text glyphs

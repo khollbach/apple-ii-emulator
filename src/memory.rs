@@ -3,7 +3,7 @@ mod rom;
 
 use std::mem;
 
-use io::Io;
+use io::{Io, SoftSwitch};
 use rom::Rom;
 
 use crate::display::{color::Color, gr, hgr, text};
@@ -48,39 +48,42 @@ impl AddressSpace {
     pub fn get(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0xbfff => self.main_ram[addr as usize],
-            0xc000..=0xcfff => self.io.get(addr),
-            0xd000..=0xffff => self.rom.get(addr),
+            0xc000..=0xcfff => self.io.read(addr),
+            0xd000..=0xffff => self.rom.read(addr),
         }
     }
 
     pub fn set(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000..=0xbfff => self.main_ram[addr as usize] = value,
-            0xc000..=0xcfff => self.io.set(addr, value),
-            0xd000..=0xffff => self.rom.set(addr, value),
+            0xc000..=0xcfff => self.io.write(addr, value),
+            0xd000..=0xffff => self.rom.write(addr, value),
         }
     }
 
     pub fn display(&self) -> Vec<Vec<Color>> {
-        let page = match (self.io.hires, self.io.page2) {
+        let page = match (
+            self.io.soft_switch(SoftSwitch::Hires),
+            self.io.soft_switch(SoftSwitch::Page2),
+        ) {
             (false, false) => &self.main_ram[0x400..0x800],
             (false, true) => &self.main_ram[0x800..0xc00],
             (true, false) => &self.main_ram[0x2000..0x4000],
             (true, true) => &self.main_ram[0x4000..0x6000],
         };
 
-        if self.io.text {
+        if self.io.soft_switch(SoftSwitch::Text) {
             return text::dots(page);
         }
 
-        let mut dots = if self.io.hires {
+        let mut dots = if self.io.soft_switch(SoftSwitch::Hires) {
             hgr::dots_bw(page); // swap these if you want B&W display
             hgr::dots_color(page)
         } else {
             gr::dots(page)
         };
 
-        if self.io.mixed {
+        if self.io.soft_switch(SoftSwitch::Mixed) {
             let mut text_dots = text::dots(page);
             for y in 20 * text::CELL_H..24 * text::CELL_H {
                 dots[y] = mem::take(&mut text_dots[y]);

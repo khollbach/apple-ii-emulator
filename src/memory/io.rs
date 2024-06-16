@@ -1,32 +1,7 @@
-//
-// Soft switch locations taken from Apple //e TRM, Page 29.
-//
+mod soft_switches;
 
-// TODO: is there a better way to refactor the soft-switch code?
-
-// const _ALTCHAR_OFF: u16 = 0xc00e;
-// const _ALTCHAR_ON: u16 = 0xc00f;
-// const _READ_ALTCHAR: u16 = 0xc01e;
-
-// const _80COL_OFF: u16 = 0xc00c;
-// const _80COL_ON: u16 = 0xc00d;
-// const _READ_80COL: u16 = 0xc01f;
-
-const PAGE2_OFF: u16 = 0xc054;
-const PAGE2_ON: u16 = 0xc055;
-const PAGE2_READ: u16 = 0xc01c;
-
-const TEXT_OFF: u16 = 0xc050;
-const TEXT_ON: u16 = 0xc051;
-const TEXT_READ: u16 = 0xc01a;
-
-const MIXED_OFF: u16 = 0xc052;
-const MIXED_ON: u16 = 0xc053;
-const MIXED_READ: u16 = 0xc01b;
-
-const HIRES_OFF: u16 = 0xc056;
-const HIRES_ON: u16 = 0xc057;
-const HIRES_READ: u16 = 0xc01d;
+pub use soft_switches::SoftSwitch;
+use soft_switches::SoftSwitches;
 
 /// $c000..$d000
 pub struct Io {
@@ -35,18 +10,15 @@ pub struct Io {
     /// $c800..=$cffe
     c800_rom: Box<[u8; 0x800 - 1]>,
 
-    /// $c000
+    /// $c000 (without hibit)
     most_recent_key: u8,
     /// $c000 hibit
     strobe_bit: bool,
     /// $c010 hibit
     any_key_down: bool,
 
-    // todo: refactor soft switches somehow.
-    pub page2: bool,
-    pub text: bool,
-    pub mixed: bool,
-    pub hires: bool,
+    /// $c000..$c100
+    switches: SoftSwitches,
 }
 
 impl Io {
@@ -60,11 +32,12 @@ impl Io {
             strobe_bit: false,
             any_key_down: false,
 
-            page2: false,
-            text: false,
-            mixed: false,
-            hires: false,
+            switches: SoftSwitches::new(),
         }
+    }
+
+    pub fn soft_switch(&self, switch: SoftSwitch) -> bool {
+        self.switches.is_set(switch)
     }
 
     pub fn key_down(&mut self, ascii_code: u8) {
@@ -78,7 +51,7 @@ impl Io {
         self.any_key_down = false;
     }
 
-    pub fn get(&mut self, addr: u16) -> u8 {
+    pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0xc000 => {
                 let mut byte = self.most_recent_key;
@@ -96,98 +69,31 @@ impl Io {
                 }
             }
 
+            // Hacks to make these programs not crash.
+            // (todo: presumably these are soft switches?)
+            // * tron
+            0xc015 | 0xc058 | 0xc05a | 0xc05d | 0xc062 | 0xc061 | 0xc030 | 0xc081 | 0xc080
+            | 0xc082 => 0,
+            0xcfff => 0, // todo: what's this byte supposed to be?
+
+            0xc000..=0xc0ff => self.switches.read(addr),
+
             0xc100..=0xc3ff => self.c100_rom[addr as usize - 0xc100],
+            // todo: c400..c800 => self test routine rom?
             0xc800..=0xcffe => self.c800_rom[addr as usize - 0xc800],
 
-            PAGE2_OFF => {
-                self.page2 = false;
-                0
-            }
-            PAGE2_ON => {
-                self.page2 = true;
-                0
-            }
-            PAGE2_READ => {
-                if self.page2 {
-                    0x80
-                } else {
-                    0
-                }
-            }
-
-            TEXT_OFF => {
-                self.text = false;
-                0
-            }
-            TEXT_ON => {
-                self.text = true;
-                0
-            }
-            TEXT_READ => {
-                if self.text {
-                    0x80
-                } else {
-                    0
-                }
-            }
-
-            MIXED_OFF => {
-                self.mixed = false;
-                0
-            }
-            MIXED_ON => {
-                self.mixed = true;
-                0
-            }
-            MIXED_READ => {
-                if self.mixed {
-                    0x80
-                } else {
-                    0
-                }
-            }
-
-            HIRES_OFF => {
-                self.hires = false;
-                0
-            }
-            HIRES_ON => {
-                self.hires = true;
-                0
-            }
-            HIRES_READ => {
-                if self.hires {
-                    0x80
-                } else {
-                    0
-                }
-            }
-
-            // Hacks to make the ROM code not crash:
-            // todo: maybe some of these are soft switches?
-            0xc015 | 0xc018 | 0xc01f | 0xc058 | 0xc05a | 0xc05d | 0xc05f | 0xc030 | 0xc062
-            | 0xc061 | 0xcfff | 0xc081 | 0xc080 | 0xc082 => 0,
-
-            // see bank select switches, Table 4-6, page 82 of TRM
             _ => panic!("${addr:04x}"),
         }
     }
 
-    pub fn set(&mut self, addr: u16, value: u8) {
+    pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             0xc010 => self.strobe_bit = false,
 
-            // todo: how to reduce code dup w/ get ?
-            TEXT_OFF => self.text = false,
-            TEXT_ON => self.text = true,
-            MIXED_OFF => self.mixed = false,
-            MIXED_ON => self.mixed = true,
-            HIRES_OFF => self.hires = false,
-            HIRES_ON => self.hires = true,
+            // Hacks to make the tron program not crash:
+            0xc007 | 0xc006 => (),
 
-            // Hacks to make the ROM code not crash:
-            // todo: maybe some of these are soft switches?
-            0xc007 | 0xc001 | 0xc055 | 0xc054 | 0xc000 | 0xc006 => (),
+            0xc000..=0xc0ff => self.switches.write(addr),
 
             _ => panic!("${addr:04x} ${value:02x}"),
         }

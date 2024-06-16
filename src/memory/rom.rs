@@ -1,6 +1,8 @@
 /// $d000..=$ffff
 pub struct Rom {
+    /// $d000..$f800
     applesoft: &'static [u8; 0x2800],
+    /// $f800..=$ffff
     f8: &'static [u8; 0x800],
 }
 
@@ -21,7 +23,7 @@ impl Rom {
         this
     }
 
-    pub fn get(&self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         if addr >= 0xff00 {
             unsafe {
                 return EXTRA_RAM[addr as u8 as usize];
@@ -35,7 +37,7 @@ impl Rom {
         }
     }
 
-    pub fn set(&self, addr: u16, value: u8) {
+    pub fn write(&self, addr: u16, value: u8) {
         // Otherwise, tron program crashes.
         // (Maybe it's trying to use bank-switched RAM?) Yeah, seems like.
         if addr >= 0xff00 {
