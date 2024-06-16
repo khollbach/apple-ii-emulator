@@ -38,7 +38,7 @@ impl Cpu {
     }
 
     pub fn next_instr(&self, mem: &mut AddressSpace) -> (Instr, Mode, Operand) {
-        let (instr, mode) = instr::decode(mem.get(self.pc));
+        let (instr, mode) = instr::decode(mem.read(self.pc));
         let arg = Operand::new(self, mem, mode);
         (instr, mode, arg)
     }
@@ -228,13 +228,13 @@ pub fn would_branch(branch: Instr, flags: Flags) -> bool {
 /// Stack operations.
 impl Cpu {
     fn push(&mut self, mem: &mut AddressSpace, value: u8) {
-        mem.set(0x0100 + self.sp as u16, value);
+        mem.write(0x0100 + self.sp as u16, value);
         self.sp = self.sp.wrapping_sub(1);
     }
 
     fn pop(&mut self, mem: &mut AddressSpace) -> u8 {
         self.sp = self.sp.wrapping_add(1);
-        mem.get(0x0100 + self.sp as u16)
+        mem.read(0x0100 + self.sp as u16)
     }
 
     fn push2(&mut self, mem: &mut AddressSpace, word: u16) {
@@ -282,7 +282,7 @@ impl Cpu {
 
         let mut next_instr_bytes = vec![];
         for i in 0..next_instr.1.instr_len() {
-            let byte = mem.get(self.pc.checked_add(i).unwrap());
+            let byte = mem.read(self.pc.checked_add(i).unwrap());
             next_instr_bytes.push(byte);
         }
 

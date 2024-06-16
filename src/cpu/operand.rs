@@ -19,8 +19,8 @@ impl Operand {
         let arg_len = mode.instr_len() - 1;
         let arg: u16 = match arg_len {
             0 => 0,
-            1 => mem.get(cpu.pc.checked_add(1).unwrap()).into(),
-            2 => get_word(mem, cpu.pc.checked_add(1).unwrap()),
+            1 => mem.read(cpu.pc.checked_add(1).unwrap()).into(),
+            2 => read_word(mem, cpu.pc.checked_add(1).unwrap()),
             _ => unreachable!(),
         };
 
@@ -56,20 +56,20 @@ impl Operand {
             },
 
             Mode::Indirect => Self::Memory {
-                addr: get_word(mem, arg),
+                addr: read_word(mem, arg),
             },
             Mode::XIndirect => Self::Memory {
-                addr: get_word(mem, (arg as u8).wrapping_add(cpu.x) as u16),
+                addr: read_word(mem, (arg as u8).wrapping_add(cpu.x) as u16),
             },
             Mode::IndirectY => Self::Memory {
-                addr: get_word(mem, arg).checked_add(cpu.y as u16).unwrap(),
+                addr: read_word(mem, arg).checked_add(cpu.y as u16).unwrap(),
             },
         }
     }
 
     pub fn get(self, cpu: &Cpu, mem: &mut AddressSpace) -> u8 {
         match self {
-            Self::Memory { addr } => mem.get(addr),
+            Self::Memory { addr } => mem.read(addr),
             Self::Literal { value } => value,
             Self::Accumulator => cpu.a,
             Self::None => panic!("operand is none; cannot get its value"),
@@ -78,7 +78,7 @@ impl Operand {
 
     pub fn set(self, cpu: &mut Cpu, mem: &mut AddressSpace, value: u8) {
         match self {
-            Self::Memory { addr } => mem.set(addr, value),
+            Self::Memory { addr } => mem.write(addr, value),
             Self::Literal { .. } => panic!("cannot mutate literal value {self:?}"),
             Self::Accumulator => cpu.a = value,
             Self::None => panic!("operand is none; cannot set its value"),
@@ -93,9 +93,9 @@ impl Operand {
     }
 }
 
-fn get_word(mem: &mut AddressSpace, addr: u16) -> u16 {
-    let lo = mem.get(addr);
-    let hi = mem.get(addr.checked_add(1).unwrap());
+fn read_word(mem: &mut AddressSpace, addr: u16) -> u16 {
+    let lo = mem.read(addr);
+    let hi = mem.read(addr.checked_add(1).unwrap());
     u16::from_le_bytes([lo, hi])
 }
 

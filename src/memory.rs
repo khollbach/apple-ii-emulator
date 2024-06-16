@@ -45,7 +45,7 @@ impl AddressSpace {
         pc
     }
 
-    pub fn get(&mut self, addr: u16) -> u8 {
+    pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0xbfff => self.main_ram[addr as usize],
             0xc000..=0xcfff => self.io.read(addr),
@@ -53,7 +53,7 @@ impl AddressSpace {
         }
     }
 
-    pub fn set(&mut self, addr: u16, value: u8) {
+    pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000..=0xbfff => self.main_ram[addr as usize] = value,
             0xc000..=0xcfff => self.io.write(addr, value),

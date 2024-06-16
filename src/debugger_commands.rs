@@ -134,7 +134,7 @@ impl Command {
             }
 
             Command::ShowByte { addr } => {
-                println!("ram[${:04x}]: ${:02x}", addr, emu.mem.get(addr));
+                println!("ram[${:04x}]: ${:02x}", addr, emu.mem.read(addr));
             }
             Command::ShowRange {
                 start,
@@ -166,7 +166,7 @@ fn show_range(mem: &mut AddressSpace, start: u16, end_inclusive: u16) {
         }
 
         if addr >= start {
-            print!("{:02x}", mem.get(addr));
+            print!("{:02x}", mem.read(addr));
         } else {
             print!("  ");
         }
