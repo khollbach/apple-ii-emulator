@@ -20,22 +20,24 @@ use winit::event_loop::{EventLoop, EventLoopClosed};
 
 /// Apple IIe emulator (work in progress!)
 #[derive(Parser)]
-#[command()]
 struct Args {
-    /// File name of a 6502 program -- just binary machine code, no file headers or anything.
-    #[arg()]
-    program: String,
+    /// The memory image file format is that of llvm-mos. From their docs:
+    ///
+    /// The image file is a collection of blocks. Each block consists of a
+    /// 16-bit starting address, then a 16-bit block size, then that many bytes
+    /// of contents. Both the address and size are stored little-endian.
+    memory_image_file: String,
 
-    /// Memory address to load the program at.
-    #[arg(long)]
-    load_addr: String,
+    /// Use this if your input file is just binary machine code -- no headers or
+    /// anything.
+    ///
+    /// Provide a memory address, in hexadecimal. We load your code into memory
+    /// at this offset, and then jump to it.
+    #[arg(long, value_name = "START_ADDR")]
+    raw_bytes: Option<String>,
 
-    /// Memory address of the first instruction to execute.
-    #[arg(long)]
-    start_addr: String,
-
-    /// Memory address to set a breakpoint in the debugger. Can be passed
-    /// multiple times.
+    /// Memory address (hexadecimal) to set a breakpoint in the debugger. Can be
+    /// passed multiple times.
     #[arg(long)]
     breakpoint: Vec<String>,
 }
@@ -43,25 +45,31 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let load_addr = hex::decode_u16(&args.load_addr)?;
-    let start_addr = hex::decode_u16(&args.start_addr)?;
-
     let mut breakpoints = Vec::with_capacity(args.breakpoint.len());
     for bp in args.breakpoint {
         let addr = hex::decode_u16(&bp)?;
         breakpoints.push(addr);
     }
 
-    let mut file = File::open(&args.program)?;
-    let mut program = vec![];
-    file.read_to_end(&mut program)?;
+    let emu = if let Some(load_addr) = args.raw_bytes {
+        let load_addr = hex::decode_u16(&load_addr)?;
+        let start_addr = load_addr;
 
-    let emu = Arc::new(Mutex::new(Emulator::new(
-        &program,
-        load_addr,
-        start_addr,
-        breakpoints,
-    )));
+        let mut file = File::open(&args.memory_image_file)?;
+        let mut bytes = vec![];
+        file.read_to_end(&mut bytes)?;
+
+        // Treat the file as raw bytes.
+        Emulator::new(&bytes, load_addr, start_addr, breakpoints)
+    } else {
+        let mut file = File::open(&args.memory_image_file)?;
+        let mut bytes = vec![];
+        file.read_to_end(&mut bytes)?;
+
+        // Read the file headers.
+        Emulator::from_memory_image(&bytes, breakpoints)?
+    };
+    let emu = Arc::new(Mutex::new(emu));
 
     let emu1 = Arc::clone(&emu);
     thread::spawn(move || run_cpu(emu1));

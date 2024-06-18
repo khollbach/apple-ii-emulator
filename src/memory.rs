@@ -1,8 +1,12 @@
 mod io;
 mod rom;
 
-use std::mem;
+use std::{
+    io::{self as std_io, Read},
+    mem,
+};
 
+use anyhow::{Context, Result};
 use io::{Io, SoftSwitch};
 use rom::Rom;
 
@@ -28,6 +32,44 @@ impl AddressSpace {
             io: Io::new(),
             rom: Rom::new(),
         }
+    }
+
+    /// The memory image file format is that of llvm-mos. From their docs:
+    ///
+    /// The image file is a collection of blocks. Each block consists of a
+    /// 16-bit starting address, then a 16-bit block size, then that many bytes
+    /// of contents. Both the address and size are stored little-endian.
+    pub fn from_memory_image(mut image: &[u8]) -> Result<(Self, u16)> {
+        let mut main_ram = Box::new([0u8; 0xc000]);
+        let mut start_addr = None;
+
+        while !image.is_empty() {
+            let mut word = [0u8; 2];
+            image.read_exact(&mut word).context("eof during header")?;
+            let offset = u16::from_le_bytes(word) as usize;
+            image.read_exact(&mut word).context("eof during header")?;
+            let length = u16::from_le_bytes(word) as usize;
+
+            if (offset, length) == (0xfffa, 6) {
+                // special case: setting start_addr (via reset vector)
+                let mut buf = [0u8; 6];
+                image.read_exact(&mut buf)?;
+                assert_eq!(buf[..2], [0, 0]);
+                start_addr = Some(u16::from_le_bytes(buf[2..4].try_into().unwrap()));
+                assert_eq!(buf[4..], [0, 0]);
+            } else {
+                image.read_exact(&mut main_ram[offset..][..length])?; // can panic
+            }
+        }
+
+        Ok((
+            Self {
+                main_ram,
+                io: Io::new(),
+                rom: Rom::new(),
+            },
+            start_addr.unwrap(),
+        ))
     }
 
     /// temporary hack: run RESET routine, but skip disk loading code.

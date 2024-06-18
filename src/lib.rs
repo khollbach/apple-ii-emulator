@@ -2,6 +2,7 @@
 
 use std::ops::ControlFlow;
 
+use anyhow::Result;
 use cpu::{instr::Instr, Cpu};
 use debugger_commands::Command;
 use display::{color::Color, gr, hgr, text};
@@ -46,6 +47,20 @@ impl Emulator {
             breakpoints,
             finish_state: None,
         }
+    }
+
+    pub fn from_memory_image(image: &[u8], breakpoints: Vec<u16>) -> Result<Self> {
+        let (mut mem, start_addr) = AddressSpace::from_memory_image(image)?;
+        let pc = mem.set_softev(start_addr);
+
+        Ok(Self {
+            cpu: Cpu::new(pc),
+            mem,
+            halted: false,
+            num_instructions_executed: 0,
+            breakpoints,
+            finish_state: None,
+        })
     }
 
     /// Called at ~300 Hz.
