@@ -112,9 +112,9 @@ fn soft_switch_info(lo: u8, rw: AccessType) -> (SoftSwitch, Operation) {
         (0x1b, Read) => (Mixed, Query),
 
         (0x56, Read | Write) => (Hires, Clear),
-        // Note the extra $c057 -- Applesoft uses this instead of $c059, so
-        // presumably it's supposed to also work.
-        (0x59 | 0x57, Read | Write) => (Hires, Set),
+        // NOTE: there's a typo in the TRM. The appendix version of table 2-10
+        // says $c059 instead of $c057. Weird.
+        (0x57, Read | Write) => (Hires, Set),
         (0x1d, Read) => (Hires, Query),
 
         (0x7e, Write) => (IouEnable, Clear),
