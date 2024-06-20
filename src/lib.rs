@@ -50,8 +50,12 @@ impl Emulator {
     }
 
     pub fn from_memory_image(image: &[u8], breakpoints: Vec<u16>) -> Result<Self> {
-        let (mut mem, start_addr) = AddressSpace::from_memory_image(image)?;
-        let pc = mem.set_softev(start_addr);
+        let (mem, start_addr) = AddressSpace::from_memory_image(image)?;
+
+        // skip this hack for now...
+        // todo, once we want to call ROM code, fix it!
+        // let pc = mem.set_softev(start_addr);
+        let pc = start_addr;
 
         Ok(Self {
             cpu: Cpu::new(pc),
@@ -89,7 +93,12 @@ impl Emulator {
     }
 
     fn check_breakpoints(&mut self) -> ControlFlow<()> {
-        if self.cpu.next_instr(&mut self.mem).0 == Instr::Brk {
+        if self.cpu.next_instr(&mut self.mem).is_err() {
+            eprintln!("\ninvalid instruction");
+            return ControlFlow::Break(());
+        }
+
+        if self.cpu.next_instr(&mut self.mem).unwrap().0 == Instr::Brk {
             eprintln!("\nwould break");
             return ControlFlow::Break(());
         }
@@ -105,7 +114,7 @@ impl Emulator {
         }
 
         if let Some(depth) = self.finish_state.as_mut() {
-            let next_instr = self.cpu.next_instr(&mut self.mem);
+            let next_instr = self.cpu.next_instr(&mut self.mem).unwrap();
             match next_instr.0 {
                 Instr::Jsr => *depth += 1,
                 Instr::Rts => {

@@ -43,12 +43,17 @@ impl AddressSpace {
         let mut main_ram = Box::new([0u8; 0xc000]);
         let mut start_addr = None;
 
+        // todo: it would be nice to check that no blocks overlap
+        // * see my old code for loading programs, for ideas
+
         while !image.is_empty() {
             let mut word = [0u8; 2];
             image.read_exact(&mut word).context("eof during header")?;
             let offset = u16::from_le_bytes(word) as usize;
             image.read_exact(&mut word).context("eof during header")?;
             let length = u16::from_le_bytes(word) as usize;
+
+            eprintln!("${:04x} ${:04x}", offset, length);
 
             if (offset, length) == (0xfffa, 6) {
                 // special case: setting start_addr (via reset vector)

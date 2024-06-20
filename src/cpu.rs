@@ -5,6 +5,7 @@ pub mod operand;
 
 use std::fmt;
 
+use anyhow::Result;
 use flags::{Flag, Flags};
 use instr::{Instr, Mode};
 use operand::Operand;
@@ -37,14 +38,14 @@ impl Cpu {
         self.pc
     }
 
-    pub fn next_instr(&self, mem: &mut AddressSpace) -> (Instr, Mode, Operand) {
-        let (instr, mode) = instr::decode(mem.read(self.pc));
+    pub fn next_instr(&self, mem: &mut AddressSpace) -> Result<(Instr, Mode, Operand)> {
+        let (instr, mode) = instr::decode(mem.read(self.pc))?;
         let arg = Operand::new(self, mem, mode);
-        (instr, mode, arg)
+        Ok((instr, mode, arg))
     }
 
     pub fn step(&mut self, mem: &mut AddressSpace) {
-        let (instr, mode, arg) = self.next_instr(mem);
+        let (instr, mode, arg) = self.next_instr(mem).unwrap();
 
         let mut pc_set = false;
         match instr {
@@ -256,7 +257,9 @@ impl Cpu {
 impl Cpu {
     /// Detect a "halt" instruction.
     pub fn would_halt(&self, mem: &mut AddressSpace) -> bool {
-        let (instr, mode, arg) = self.next_instr(mem);
+        let Ok((instr, mode, arg)) = self.next_instr(mem) else {
+            return false;
+        };
         let abs_jmp = instr == Instr::Jmp && mode == Mode::Absolute;
         let active_branch = mode == Mode::Relative && would_branch(instr, self.flags);
         (abs_jmp || active_branch) && arg.addr() == self.pc
@@ -277,8 +280,17 @@ impl fmt::Debug for Cpu {
 }
 
 impl Cpu {
-    pub fn dbg_next_instr(&self, mem: &mut AddressSpace) -> DbgNextInstr {
-        let next_instr = self.next_instr(mem);
+    pub fn dbg_next_instr(&self, mem: &mut AddressSpace) -> impl fmt::Display {
+        // todo: separate out the cpu dbg from the instr dbg;
+        // I think that makes more sense.
+
+        let next_instr = match self.next_instr(mem) {
+            Ok(instr) => instr,
+            Err(e) => {
+                let ret: Box<dyn fmt::Display> = Box::new(e);
+                return ret;
+            }
+        };
 
         let mut next_instr_bytes = vec![];
         for i in 0..next_instr.1.instr_len() {
@@ -286,11 +298,11 @@ impl Cpu {
             next_instr_bytes.push(byte);
         }
 
-        DbgNextInstr {
+        Box::new(DbgNextInstr {
             cpu: self.clone(),
             next_instr,
             next_instr_bytes,
-        }
+        })
     }
 }
 
