@@ -7,6 +7,8 @@ use soft_switches::SoftSwitches;
 pub struct Io {
     /// $c100..$c400
     c100_rom: Box<[u8; 0x300]>,
+    /// $c400..$c800
+    self_test_rom: Box<[u8; 0x400]>,
     /// $c800..=$cffe
     c800_rom: Box<[u8; 0x800 - 1]>,
 
@@ -24,8 +26,11 @@ pub struct Io {
 impl Io {
     pub fn new() -> Self {
         let rom = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/Unenh_IIe_80col"));
+        let self_test = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/rom/unenh_self_test"));
+
         Self {
             c100_rom: Box::new(rom[..0x300].try_into().unwrap()),
+            self_test_rom: Box::new(*self_test),
             c800_rom: Box::new(rom[0x300..].try_into().unwrap()),
 
             most_recent_key: 0u8,
@@ -72,14 +77,17 @@ impl Io {
             // Hacks to make these programs not crash.
             // (todo: presumably these are soft switches?)
             // * tron
-            0xc015 | 0xc058 | 0xc05a | 0xc05d | 0xc062 | 0xc061 | 0xc030 | 0xc081 | 0xc080
-            | 0xc082 => 0,
-            0xcfff => 0, // todo: what's this byte supposed to be?
+            0xc015 | 0xc058 | 0xc05a | 0xc05d | 0xc062 | 0xc061 | 0xc030 => 0,
+
+            // todo: bank select
+            0xc081 | 0xc080 | 0xc082 => 0,
 
             0xc000..=0xc0ff => self.switches.read(addr),
 
+            0xcfff => 0, // todo: what's this byte supposed to be?
+
             0xc100..=0xc3ff => self.c100_rom[addr as usize - 0xc100],
-            // todo: c400..c800 => self test routine rom?
+            0xc400..=0xc7ff => self.self_test_rom[addr as usize - 0xc400],
             0xc800..=0xcffe => self.c800_rom[addr as usize - 0xc800],
 
             _ => panic!("${addr:04x}"),
