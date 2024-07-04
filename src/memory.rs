@@ -20,6 +20,13 @@ pub struct AddressSpace {
     io: Io,
     /// $d000..=$ffff
     rom: Rom,
+
+    /// Language card RAM:
+    /// $d000..=$ffff
+    lc_ram: Box<[u8; 0x4000]>,
+    /// Language card RAM, bank 2:
+    /// $d000..$e000
+    lc_bank_2: Box<[u8; 0x1000]>,
 }
 
 impl AddressSpace {
@@ -31,6 +38,8 @@ impl AddressSpace {
             main_ram,
             io: Io::new(),
             rom: Rom::new(),
+            lc_ram: Box::new([0u8; 0x4000]),
+            lc_bank_2: Box::new([0u8; 0x1000]),
         }
     }
 
@@ -72,6 +81,8 @@ impl AddressSpace {
                 main_ram,
                 io: Io::new(),
                 rom: Rom::new(),
+                lc_ram: Box::new([0u8; 0x4000]),
+                lc_bank_2: Box::new([0u8; 0x1000]),
             },
             start_addr.unwrap(),
         ))
@@ -91,6 +102,8 @@ impl AddressSpace {
         let pc = 0xfa62; // RESET
         pc
     }
+
+    // TODO: use bank select soft switches to decide which RAM/ROM to read/write
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {

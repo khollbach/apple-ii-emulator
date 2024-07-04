@@ -5,7 +5,7 @@ pub struct SoftSwitches {
     states: HashMap<SoftSwitch, bool>,
 }
 
-/// See Apple //e Technical Reference Manaul, Appendix F: Frequently Used
+/// See Apple //e Technical Reference Manual, Appendix F: Frequently Used
 /// Tables, starting on page 258.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SoftSwitch {
@@ -19,17 +19,14 @@ pub enum SoftSwitch {
     IouEnable,
     Dhires,
 
-    // todo: impl bank select switches (note the weirdness!) see page 264
     /// Write protect language card RAM.
-    //WriteProtect,
+    WriteProtect,
     /// In language card RAM, select bank 2 for $d000..$e000.
-    //Bnk2,
+    Bnk2,
     /// Enable language card RAM for reading, instead of ROM.
-    //Lcram,
+    Lcram,
     /// todo: not quite sure what this does
-    //Altzp,
-    #[allow(dead_code)]
-    Todo,
+    Altzp,
 }
 
 impl SoftSwitches {
@@ -85,8 +82,11 @@ fn soft_switch_info(lo: u8, rw: AccessType) -> (SoftSwitch, Operation) {
     use Operation::*;
     use SoftSwitch::*;
 
-    // This information is from Table 2-10 in the TRM.
+    // This information is from tables 2-10 and 4-6 in the TRM.
     match (lo, rw) {
+        //
+        // Table 2-10. Display Soft Switches
+        //
         (0x0e, Write) => (Altchar, Clear),
         (0x0f, Write) => (Altchar, Set),
         (0x1e, Read) => (Altchar, Query),
@@ -125,7 +125,16 @@ fn soft_switch_info(lo: u8, rw: AccessType) -> (SoftSwitch, Operation) {
         (0x5f, Read | Write) => (Dhires, Set),
         (0x7f, Read) => (Dhires, Query),
 
-        // todo: handle bank select
+        //
+        // Table 4-6. Bank Select Switches
+        //
+        (0x11, Read) => (Bnk2, Query),
+        (0x12, Read) => (Lcram, Query),
+
+        (0x08, Write) => (Altzp, Clear),
+        (0x09, Write) => (Altzp, Set),
+        (0x16, Read) => (Altzp, Query),
+
         _ => panic!("$c0{lo:02x}"),
     }
 }
