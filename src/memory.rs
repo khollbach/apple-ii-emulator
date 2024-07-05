@@ -76,6 +76,10 @@ impl AddressSpace {
             }
         }
 
+        // todo: hack: init stack pointer, since llvm-mos seems not to do it correctly
+        main_ram[0] = 0x00;
+        main_ram[1] = 0xc0; // $0000..$c000 <- RAM     (above that, it's IO / ROM / etc)
+
         Ok((
             Self {
                 main_ram,
