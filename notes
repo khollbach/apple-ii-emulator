@@ -21,3 +21,25 @@ hardware features:
 * inverse text glyphs
 * blinking glyphs
 
+---
+
+**************************************************************
+* (UPDATE): it's been a long time since I've worked on this,
+* and I think some stuff is broken, so maybe best thing to do
+* is get a simple "hello world" program before moving forward.
+* And if that doesn't work as expected there's a good chance
+* that things were broken in the most recent commit, so try
+* again on a slightly older commit as well.
+**************************************************************
+
+left off:
+[ ] impl setting values in the debugger
+[ ] use this fxnality to set
+        c511: 3f
+    so that the ROM self-test skips the
+    "die" due to un-impl'd soft switches
+    and proceeds to run the other tests
+[ ] see what happens. Then decide what to
+    work on next.
+    > we'll have bugs in the bank-switching code
+        to test and fix...

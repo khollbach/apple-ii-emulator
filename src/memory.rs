@@ -23,7 +23,7 @@ pub struct AddressSpace {
 
     /// Language card RAM:
     /// $d000..=$ffff
-    lc_ram: Box<[u8; 0x4000]>,
+    lc_ram: Box<[u8; 0x3000]>,
     /// Language card RAM, bank 2:
     /// $d000..$e000
     lc_bank_2: Box<[u8; 0x1000]>,
@@ -38,7 +38,7 @@ impl AddressSpace {
             main_ram,
             io: Io::new(),
             rom: Rom::new(),
-            lc_ram: Box::new([0u8; 0x4000]),
+            lc_ram: Box::new([0u8; 0x3000]),
             lc_bank_2: Box::new([0u8; 0x1000]),
         }
     }
@@ -85,7 +85,7 @@ impl AddressSpace {
                 main_ram,
                 io: Io::new(),
                 rom: Rom::new(),
-                lc_ram: Box::new([0u8; 0x4000]),
+                lc_ram: Box::new([0u8; 0x3000]),
                 lc_bank_2: Box::new([0u8; 0x1000]),
             },
             start_addr.unwrap(),
@@ -107,13 +107,16 @@ impl AddressSpace {
         pc
     }
 
-    // TODO: use bank select soft switches to decide which RAM/ROM to read/write
-
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0xbfff => self.main_ram[addr as usize],
             0xc000..=0xcfff => self.io.read(addr),
-            0xd000..=0xffff => self.rom.read(addr),
+            0xd000..=0xffff if !self.io.soft_switch(SoftSwitch::Lcram) => self.rom.read(addr),
+
+            0xd000..=0xdfff if self.io.soft_switch(SoftSwitch::Bnk2) => {
+                self.lc_bank_2[addr as usize - 0xd000]
+            }
+            0xd000..=0xffff => self.lc_ram[addr as usize - 0xd000],
         }
     }
 
@@ -121,11 +124,27 @@ impl AddressSpace {
         match addr {
             0x0000..=0xbfff => self.main_ram[addr as usize] = value,
             0xc000..=0xcfff => self.io.write(addr, value),
-            0xd000..=0xffff => self.rom.write(addr, value),
+            0xd000..=0xffff if self.io.soft_switch(SoftSwitch::WriteProtect) => {
+                eprintln!(
+                    "warning: writing to protected language card ram: ${:04x}: ${:02x}",
+                    addr, value
+                );
+            }
+
+            0xd000..=0xdfff if self.io.soft_switch(SoftSwitch::Bnk2) => {
+                self.lc_bank_2[addr as usize - 0xd000] = value;
+            }
+            0xd000..=0xffff => self.lc_ram[addr as usize - 0xd000] = value,
         }
     }
 
     pub fn display(&self) -> Vec<Vec<Color>> {
+        // todo: this logic is buggy:
+        // * if text and hires are both set, we use the wrong page (causing a panic)
+        // * if hires and mixed are both set, we use the hires page for text (oops)
+        // * maybe other stuff too?
+        // Maybe we shouldn't try to be so clever. Just write something that works :P
+
         let page = match (
             self.io.soft_switch(SoftSwitch::Hires),
             self.io.soft_switch(SoftSwitch::Page2),
@@ -141,8 +160,8 @@ impl AddressSpace {
         }
 
         let mut dots = if self.io.soft_switch(SoftSwitch::Hires) {
-            hgr::dots_bw(page); // swap these if you want B&W display
-            hgr::dots_color(page)
+            hgr::dots_color(page);
+            hgr::dots_bw(page) // swap these if you want B&W display
         } else {
             gr::dots(page)
         };

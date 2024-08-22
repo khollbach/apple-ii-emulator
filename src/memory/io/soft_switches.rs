@@ -56,6 +56,12 @@ impl SoftSwitches {
     fn access(&mut self, addr: u16, rw: AccessType) -> Option<bool> {
         let [lo, hi] = addr.to_le_bytes();
         assert_eq!(hi, 0xc0);
+
+        if lo & 0x80 != 0 {
+            self.bank_select(lo, rw);
+            return None;
+        }
+
         let (switch, op) = soft_switch_info(lo, rw);
         match op {
             Operation::Clear => self.states.insert(switch, false),
@@ -64,8 +70,36 @@ impl SoftSwitches {
         };
         None
     }
+
+    fn bank_select(&mut self, lo: u8, rw: AccessType) {
+        assert_eq!(lo & 0xf0, 0x80);
+        assert_eq!(lo & 0b_0100, 0);
+        if rw == AccessType::Write {
+            // The docs say you accesses to these switches should be reads. But
+            // the IIe self-test rom routines write to them, so we'll allow it.
+            eprintln!("warning: write to bank select soft switch: $c0{:02x}", lo);
+        }
+
+        // NOTE: this is flipped from what you'd probably expect.
+        let bank_1 = lo & 0b_1000 != 0;
+        self.states.insert(SoftSwitch::Bnk2, !bank_1);
+
+        // Again, note the flip.
+        //
+        // todo: technically, you're supposed to access the soft switch twice in
+        // a row to enable read/write mode. We're ignoring that detail for now.
+        // (Note that read-only mode takes effect right away; it's only
+        // read/write mode that takes two accesses.)
+        let write_enable = lo & 0b_0001 != 0;
+        self.states.insert(SoftSwitch::WriteProtect, !write_enable);
+
+        // If the two lowest bits are the same, read RAM. Otherwise, read ROM.
+        let read_ram = lo & 0b_0010 == lo & 0b_0001;
+        self.states.insert(SoftSwitch::Lcram, read_ram);
+    }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AccessType {
     Read,
     Write,

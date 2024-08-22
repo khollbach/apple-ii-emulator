@@ -30,7 +30,7 @@ use crate::{
 
 /// What is the side-length (in physical pixels) of an emulated pixel (i.e. a
 /// "dot of light" on the CRT display).
-const SCALE: usize = 2;
+const SCALE: usize = 3;
 
 const DESIRED_WINDOW_SIZE: PhysicalSize<u32> =
     PhysicalSize::new((hgr::W * SCALE) as u32, (hgr::H * SCALE) as u32);

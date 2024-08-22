@@ -78,6 +78,8 @@ impl Io {
             // (todo: presumably these are soft switches?)
             // * tron
             0xc015 | 0xc058 | 0xc05a | 0xc05d | 0xc062 | 0xc061 | 0xc030 => 0,
+            // * self-test rom
+            0xc013 | 0xc014 | 0xc017 => 0,
 
             // todo: bank select
             0xc081 | 0xc080 | 0xc082 => 0,
@@ -100,6 +102,8 @@ impl Io {
 
             // Hacks to make the tron program not crash:
             0xc007 | 0xc006 => (),
+            // * self-test rom
+            0xc003 | 0xc002 | 0xc005 | 0xc004 | 0xc00b | 0xc00a => (),
 
             0xc000..=0xc0ff => self.switches.write(addr),
 
