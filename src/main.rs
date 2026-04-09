@@ -14,12 +14,22 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use apple_ii_emulator::{debugger_commands::Command, gui::Gui, hex, Emulator};
-use clap::{command, Parser};
+use clap::{
+    builder::{styling::AnsiColor, Styles},
+    command, Parser,
+};
 use itertools::Itertools;
 use winit::event_loop::{EventLoop, EventLoopClosed};
 
+const HELP_MESSAGE_STYLE: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().bold())
+    .usage(AnsiColor::Green.on_default().bold())
+    .literal(AnsiColor::Cyan.on_default().bold())
+    .placeholder(AnsiColor::Cyan.on_default());
+
 /// Apple IIe emulator (work in progress!)
 #[derive(Parser)]
+#[clap(styles = HELP_MESSAGE_STYLE)]
 struct Args {
     /// The memory image file format is that of llvm-mos. From their docs:
     ///
